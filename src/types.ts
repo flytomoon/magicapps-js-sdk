@@ -1,4 +1,4 @@
-/** Configuration for the MagicApps SDK client. */
+/** Configuration for the Magic Apps Cloud SDK client. */
 export interface MagicAppsConfig {
   /** Base URL of the MagicApps API. */
   baseUrl: string;

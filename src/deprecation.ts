@@ -49,7 +49,7 @@ export function warnDeprecated(
     : "";
 
   console.warn(
-    `[MagicApps SDK] DEPRECATED: ${methodName}() is deprecated since v${options.since}.${removeNotice} ${options.message}`,
+    `[Magic Apps Cloud SDK] DEPRECATED: ${methodName}() is deprecated since v${options.since}.${removeNotice} ${options.message}`,
   );
 }
 

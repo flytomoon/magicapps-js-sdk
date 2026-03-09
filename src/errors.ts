@@ -1,4 +1,4 @@
-/** Base error class for MagicApps SDK errors. */
+/** Base error class for Magic Apps Cloud SDK errors. */
 export class MagicAppsError extends Error {
   constructor(message: string) {
     super(message);

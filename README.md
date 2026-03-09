@@ -1,19 +1,19 @@
-# @magicapps/sdk
+# @magicapps-cloud/sdk
 
-Official TypeScript/JavaScript SDK for the MagicApps platform.
+Official TypeScript/JavaScript SDK for the Magic Apps Cloud platform.
 
 ## Installation
 
 ```bash
-npm install @magicapps/sdk
+npm install @magicapps-cloud/sdk
 ```
 
 ## Quick Start
 
 ```typescript
-import { MagicAppsClient } from "@magicapps/sdk";
+import { MagicAppsCloudClient } from "@magicapps-cloud/sdk";
 
-const client = new MagicAppsClient({
+const client = new MagicAppsCloudClient({
   baseUrl: "https://api.yourplatform.com",
   appId: "your-app-id",
 });
@@ -31,7 +31,7 @@ const { data: templates } = await client.listTemplates();
 Pass an auth token for authenticated endpoints:
 
 ```typescript
-const client = new MagicAppsClient({
+const client = new MagicAppsCloudClient({
   baseUrl: "https://api.yourplatform.com",
   appId: "your-app-id",
   authToken: "your-jwt-token",
@@ -45,7 +45,7 @@ client.setAuthToken("new-token");
 
 | Option | Type | Required | Default | Description |
 |--------|------|----------|---------|-------------|
-| `baseUrl` | `string` | Yes | - | Base URL of the MagicApps API |
+| `baseUrl` | `string` | Yes | - | Base URL of the Magic Apps Cloud API |
 | `appId` | `string` | Yes | - | Your registered application ID |
 | `authToken` | `string` | No | - | JWT token for authenticated requests |
 | `timeout` | `number` | No | `30000` | Request timeout in milliseconds |
@@ -53,14 +53,14 @@ client.setAuthToken("new-token");
 ## Error Handling
 
 ```typescript
-import { MagicAppsClient, ApiError, MagicAppsError } from "@magicapps/sdk";
+import { MagicAppsCloudClient, ApiError, MagicAppsCloudError } from "@magicapps-cloud/sdk";
 
 try {
   await client.getAppInfo();
 } catch (error) {
   if (error instanceof ApiError) {
     console.error(`API error ${error.statusCode}: ${error.message}`);
-  } else if (error instanceof MagicAppsError) {
+  } else if (error instanceof MagicAppsCloudError) {
     console.error(`SDK error: ${error.message}`);
   }
 }

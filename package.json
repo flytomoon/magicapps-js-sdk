@@ -1,7 +1,7 @@
 {
-  "name": "@magicapps/sdk",
+  "name": "@magicapps-cloud/sdk",
   "version": "0.1.0",
-  "description": "MagicApps Developer SDK for TypeScript/JavaScript",
+  "description": "Magic Apps Cloud SDK for TypeScript/JavaScript",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
