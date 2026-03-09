@@ -4,6 +4,15 @@ import type {
   Template,
   ApiResponse,
   PaginatedResponse,
+  ChatCompletionRequest,
+  ChatCompletionResponse,
+  EmbeddingResponse,
+  ImageGenerationResponse,
+  ModerationResponse,
+  AiUsageSummary,
+  Device,
+  DeviceCatalogResponse,
+  RegistryApp,
 } from "./types.js";
 import { ApiError, MagicAppsError } from "./errors.js";
 
@@ -60,6 +69,175 @@ export class MagicAppsClient {
       "GET",
       `/apps/${this.appId}/templates/${templateId}`,
     );
+  }
+
+  /** Create a new template for the current application. Requires auth. */
+  async createTemplate(
+    template: Omit<Template, "template_id" | "app_id" | "created_at" | "updated_at">,
+  ): Promise<ApiResponse<Template>> {
+    return this.request<Template>(
+      "POST",
+      `/apps/${this.appId}/templates`,
+      template,
+    );
+  }
+
+  /** Update an existing template. Requires auth. */
+  async updateTemplate(
+    templateId: string,
+    template: Partial<Omit<Template, "template_id" | "app_id" | "created_at" | "updated_at">>,
+  ): Promise<ApiResponse<Template>> {
+    return this.request<Template>(
+      "PUT",
+      `/apps/${this.appId}/templates/${templateId}`,
+      template,
+    );
+  }
+
+  /** Delete a template. Requires auth. */
+  async deleteTemplate(templateId: string): Promise<ApiResponse<void>> {
+    return this.request<void>(
+      "DELETE",
+      `/apps/${this.appId}/templates/${templateId}`,
+    );
+  }
+
+  // --- AI Services ---
+
+  /** Create a chat completion via the AI proxy (OpenAI-compatible format). */
+  async createChatCompletion(
+    request: ChatCompletionRequest,
+  ): Promise<ApiResponse<ChatCompletionResponse>> {
+    return this.request<ChatCompletionResponse>(
+      "POST",
+      `/apps/${this.appId}/ai/chat/completions`,
+      request,
+    );
+  }
+
+  /** Generate embeddings for the given input text. */
+  async createEmbedding(
+    input: string,
+    model?: string,
+  ): Promise<ApiResponse<EmbeddingResponse>> {
+    return this.request<EmbeddingResponse>(
+      "POST",
+      `/apps/${this.appId}/ai/embeddings`,
+      { input, ...(model ? { model } : {}) },
+    );
+  }
+
+  /** Generate images from a text prompt. */
+  async createImage(
+    prompt: string,
+    options?: { n?: number; size?: string; model?: string },
+  ): Promise<ApiResponse<ImageGenerationResponse>> {
+    return this.request<ImageGenerationResponse>(
+      "POST",
+      `/apps/${this.appId}/ai/images/generations`,
+      { prompt, ...options },
+    );
+  }
+
+  /** Check content for policy violations. */
+  async createModeration(
+    input: string,
+    model?: string,
+  ): Promise<ApiResponse<ModerationResponse>> {
+    return this.request<ModerationResponse>(
+      "POST",
+      `/apps/${this.appId}/ai/moderations`,
+      { input, ...(model ? { model } : {}) },
+    );
+  }
+
+  /** Get AI usage summary for the current app. */
+  async getAiUsageSummary(): Promise<ApiResponse<AiUsageSummary>> {
+    return this.request<AiUsageSummary>(
+      "GET",
+      `/apps/${this.appId}/ai/usage/summary`,
+    );
+  }
+
+  // --- Devices ---
+
+  /** Fetch the device catalog for the current app. */
+  async getDevices(): Promise<ApiResponse<DeviceCatalogResponse>> {
+    return this.request<DeviceCatalogResponse>(
+      "GET",
+      `/apps/${this.appId}/devices`,
+    );
+  }
+
+  // --- Registry ---
+
+  /** Browse the registry catalog of well-known apps and templates. */
+  async getRegistryApps(): Promise<ApiResponse<RegistryApp[]>> {
+    return this.request<RegistryApp[]>("GET", `/registry/apps`);
+  }
+
+  // --- Endpoints ---
+
+  /** Create a new webhook endpoint for the current app. Requires owner auth. */
+  async createEndpoint(): Promise<ApiResponse<{
+    slug: string;
+    status: string;
+    expires_at: number;
+    endpoint_path: string;
+    hmac_secret?: string;
+    hmac_required?: boolean;
+  }>> {
+    return this.request("POST", `/apps/${this.appId}/endpoints`);
+  }
+
+  /** Revoke an endpoint and create a replacement. Requires owner auth. */
+  async revokeAndReplaceEndpoint(oldSlug: string): Promise<ApiResponse<{
+    old_slug: string;
+    new_slug: string;
+    new_endpoint_path: string;
+    revoked_expires_at: number;
+    new_expires_at: number;
+    hmac_secret?: string;
+    hmac_required?: boolean;
+  }>> {
+    return this.request("POST", `/apps/${this.appId}/endpoints/revoke_and_replace`, { old_slug: oldSlug });
+  }
+
+  /** Revoke an endpoint without replacement. Requires owner auth. */
+  async revokeEndpoint(slug: string): Promise<ApiResponse<{
+    slug: string;
+    revoked: boolean;
+  }>> {
+    return this.request("POST", `/apps/${this.appId}/endpoints/revoke`, { slug });
+  }
+
+  // --- Events ---
+
+  /** Post an event to a slug endpoint. */
+  async postEvent(
+    slug: string,
+    payload: Record<string, unknown>,
+  ): Promise<ApiResponse<{
+    slug: string;
+    timestamp: number;
+    expires_at: number;
+  }>> {
+    return this.request("POST", `/events/${slug}`, payload);
+  }
+
+  /** Consume an event from a slug endpoint (single-slot, consume-on-read). */
+  async consumeEvent(slug: string): Promise<ApiResponse<{
+    slug: string;
+    timestamp?: number;
+    created_at?: number;
+    expires_at?: number;
+    text?: string;
+    keywords?: string[];
+    raw_text?: string;
+    metadata?: Record<string, unknown>;
+    empty?: boolean;
+  }>> {
+    return this.request("GET", `/events/${slug}`);
   }
 
   private async request<T>(
