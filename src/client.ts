@@ -225,6 +225,84 @@ export class MagicAppsClient {
     return this.request("POST", `/events/${slug}`, payload);
   }
 
+  // --- Lookup Tables ---
+
+  /** List available lookup tables. */
+  async listLookupTables(): Promise<ApiResponse<{
+    items: Array<{
+      lookup_table_id: string;
+      name: string;
+      description?: string | null;
+      schema_keys: string[];
+      schema_key_count: number;
+      schema_keys_truncated: boolean;
+      version: number;
+      payload_hash: string;
+      storage_mode: string;
+      chunk_count: number;
+      updated_at: number;
+    }>;
+  }>> {
+    return this.request("GET", `/lookup-tables`);
+  }
+
+  /** Get a specific lookup table's metadata including chunk refs. */
+  async getLookupTable(lookupTableId: string): Promise<ApiResponse<{
+    lookup_table_id: string;
+    name: string;
+    description?: string | null;
+    schema_keys: string[];
+    schema_key_count: number;
+    schema_keys_truncated: boolean;
+    version: number;
+    payload_hash: string;
+    storage_mode: string;
+    chunk_count: number;
+    updated_at: number;
+    prompt?: string | null;
+    default_success_sentence?: string | null;
+    default_fail_sentence?: string | null;
+    chunk_encoding: string;
+    manifest_hash: string;
+    chunks: Array<{
+      index: number;
+      path: string;
+      sha256: string;
+      byte_length: number;
+    }>;
+  }>> {
+    return this.request("GET", `/lookup-tables/${encodeURIComponent(lookupTableId)}`);
+  }
+
+  /** Fetch an individual data chunk by index. */
+  async getLookupTableChunk(
+    lookupTableId: string,
+    chunkIndex: number,
+    version?: number,
+  ): Promise<ApiResponse<Record<string, unknown>>> {
+    const params = new URLSearchParams();
+    if (version !== undefined) params.set("version", String(version));
+    const query = params.toString();
+    const path = `/lookup-tables/${encodeURIComponent(lookupTableId)}/chunks/${chunkIndex}${query ? `?${query}` : ""}`;
+    return this.request("GET", path);
+  }
+
+  /** Fetch all chunks and assemble the complete dataset. */
+  async getFullLookupTableDataset(
+    lookupTableId: string,
+  ): Promise<ApiResponse<Record<string, unknown>>> {
+    const tableResponse = await this.getLookupTable(lookupTableId);
+    const table = tableResponse.data;
+    const result: Record<string, unknown> = {};
+
+    for (let i = 0; i < table.chunk_count; i++) {
+      const chunkResponse = await this.getLookupTableChunk(lookupTableId, i, table.version);
+      Object.assign(result, chunkResponse.data);
+    }
+
+    return { data: result, status: 200 };
+  }
+
   /** Consume an event from a slug endpoint (single-slot, consume-on-read). */
   async consumeEvent(slug: string): Promise<ApiResponse<{
     slug: string;
