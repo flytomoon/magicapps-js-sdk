@@ -1,17 +1,17 @@
-# @magicapps-cloud/sdk
+# @magic-apps-cloud/sdk
 
 Official TypeScript/JavaScript SDK for the Magic Apps Cloud platform.
 
 ## Installation
 
 ```bash
-npm install @magicapps-cloud/sdk
+npm install @magic-apps-cloud/sdk
 ```
 
 ## Quick Start
 
 ```typescript
-import { MagicAppsCloudClient } from "@magicapps-cloud/sdk";
+import { MagicAppsCloudClient } from "@magic-apps-cloud/sdk";
 
 const client = new MagicAppsCloudClient({
   baseUrl: "https://api.yourplatform.com",
@@ -53,7 +53,7 @@ client.setAuthToken("new-token");
 ## Error Handling
 
 ```typescript
-import { MagicAppsCloudClient, ApiError, MagicAppsCloudError } from "@magicapps-cloud/sdk";
+import { MagicAppsCloudClient, ApiError, MagicAppsCloudError } from "@magic-apps-cloud/sdk";
 
 try {
   await client.getAppInfo();
