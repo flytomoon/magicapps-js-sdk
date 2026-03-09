@@ -1,0 +1,11 @@
+# Source files (dist is published instead)
+src/
+__tests__/
+
+# Config files
+tsconfig.json
+vitest.config.ts
+
+# Development
+node_modules/
+.gitignore
