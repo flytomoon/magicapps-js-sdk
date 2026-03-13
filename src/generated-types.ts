@@ -1,8 +1,23 @@
 /**
  * Auto-generated API types from OpenAPI specification.
  * DO NOT EDIT MANUALLY - regenerate with: npm run openapi:generate-types
- * Generated at: 2026-03-09T07:54:32.668Z
+ * Generated at: 2026-03-13T17:44:30.430Z
  */
+
+/** Platform health check response with per-service status */
+export interface PlatformHealthResponse {
+  /** "Overall platform status: healthy (all pass), degraded (some non-critical fail), unhealthy (critical failures)" */
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  /** ISO 8601 timestamp of when the check was performed */
+  timestamp: string;
+  /** Deployment environment identifier (dev, staging, prod) */
+  environment: string;
+  /** Per-service health check results */
+  checks: Record<string, unknown>;
+  required?: string;
+  /** Generic status message without secrets or internal details */
+  properties?: 'pass' | 'fail';
+}
 
 export interface AuthTokenResponse {
   user?: Record<string, unknown>;
