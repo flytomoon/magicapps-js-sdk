@@ -10,6 +10,8 @@ import type {
   ImageGenerationResponse,
   ModerationResponse,
   AiUsageSummary,
+  AiUsageResponse,
+  AiUsageOptions,
   Device,
   DeviceCatalogResponse,
   RegistryApp,
@@ -149,6 +151,19 @@ export class MagicAppsClient {
       `/apps/${this.appId}/ai/moderations`,
       { input, ...(model ? { model } : {}) },
     );
+  }
+
+  /** Get detailed per-request AI usage records for the current app. */
+  async getAiUsage(
+    options?: AiUsageOptions,
+  ): Promise<ApiResponse<AiUsageResponse>> {
+    const params = new URLSearchParams();
+    if (options?.limit !== undefined) params.set("limit", String(options.limit));
+    if (options?.start_date) params.set("start_date", options.start_date);
+    if (options?.end_date) params.set("end_date", options.end_date);
+    const query = params.toString();
+    const path = `/apps/${this.appId}/ai/usage${query ? `?${query}` : ""}`;
+    return this.request<AiUsageResponse>("GET", path);
   }
 
   /** Get AI usage summary for the current app. */
