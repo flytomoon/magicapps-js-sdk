@@ -30,3 +30,8 @@ export {
   warnDeprecated,
   type DeprecationOptions,
 } from "./deprecation.js";
+export {
+  generateHmacSignature,
+  verifyHmacSignature,
+  type HmacSignatureHeaders,
+} from "./hmac.js";

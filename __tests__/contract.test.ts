@@ -810,7 +810,7 @@ describe("SDK ↔ API Contract Validation", () => {
       { name: "listLookupTables", method: "GET", path: "/lookup-tables" },
       { name: "getLookupTable", method: "GET", path: "/lookup-tables/lt-1" },
       { name: "getLookupTableChunk", method: "GET", path: "/lookup-tables/lt-1/chunks/0" },
-      // getFullLookupTableDataset is a composite — calls getLookupTable + getLookupTableChunk
+      // getFullLookupTableDataset and getAllDevices are composites
     ];
 
     it.each(sdkMethods)(
@@ -837,7 +837,7 @@ describe("SDK ↔ API Contract Validation", () => {
 
       // Every API method should be listed in sdkMethods (or be a composite)
       const catalogedNames = new Set(sdkMethods.map((m) => m.name));
-      const composites = new Set(["getFullLookupTableDataset"]); // composite methods
+      const composites = new Set(["getFullLookupTableDataset", "getAllDevices"]); // composite methods
 
       const uncovered = apiMethods.filter(
         (m) => !catalogedNames.has(m) && !composites.has(m),

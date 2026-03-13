@@ -169,6 +169,13 @@ export class MagicAppsClient {
     );
   }
 
+  /** Convenience: get a flat list of all devices from the catalog. */
+  async getAllDevices(): Promise<Device[]> {
+    const response = await this.getDevices();
+    const catalog = response.data;
+    return catalog.devices ?? [];
+  }
+
   // --- Registry ---
 
   /** Browse the registry catalog of well-known apps and templates. */
