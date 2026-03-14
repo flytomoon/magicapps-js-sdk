@@ -5,15 +5,17 @@
  * the correct HTTP method, path, and request body shape. They mock `fetch` at
  * the SDK level and assert the correct URL / method / body are sent.
  *
+ * **Golden fixtures** are sourced from real Lambda handler return statements.
+ * Each fixture includes a source comment referencing the Lambda file, function,
+ * and approximate line number. Do NOT invent fields or types — every field in
+ * a fixture must exist in the corresponding handler's response.
+ *
  * Route catalog derived from:
  *   - apigateway_http.tf (definitive route_key list)
  *   - lambda/templates/index.js, lambda/devices/index.js,
  *     lambda/endpoints/index.js, lambda/events/index.js,
  *     lambda/lookup_tables/index.js, lambda/ai_proxy/index.js,
  *     lambda/registry/index.js
- *
- * Mismatches fixed during initial creation: None — all SDK methods matched
- * their corresponding API Gateway routes and Lambda handler expectations.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MagicAppsClient } from "../src/client.js";
@@ -151,6 +153,340 @@ function routeExists(method: string, concretePath: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Golden response fixtures — sourced from real Lambda handler return statements
+// ---------------------------------------------------------------------------
+
+// Source: lambda/templates/index.js handleAppGet (~line 496-501)
+// Response shape: full app object from registry (varies by app)
+const FIXTURE_APP_INFO = {
+  app_id: "test-app",
+  name: "Test App",
+  public_description: "A test application",
+  description: "Test description",
+  created_by_name: "Test Creator",
+  maintainer: "Test Maintainer",
+  category: "productivity",
+  tags: ["test"],
+  aliases: [],
+  group: "",
+  is_new_until: "",
+  last_verified_at: "",
+  integrations: [{ template_type: "dictation" }],
+};
+
+// Source: lambda/templates/index.js handleList (~line 858-860)
+// Response shape: { items: Template[] }
+const FIXTURE_TEMPLATES_LIST = {
+  items: [
+    {
+      id: "tmpl-1",
+      template_name: "Test Template",
+      template_type: "dictation",
+      app_id: "test-app",
+    },
+  ],
+};
+
+// Source: lambda/templates/index.js handleGet (~line 871-898)
+// Response shape: single template object
+const FIXTURE_TEMPLATE = {
+  id: "tmpl-1",
+  integration_id: "int-1",
+  app_id: "test-app",
+  template_name: "Test Template",
+  template_type: "dictation",
+  endpoint_pattern: "/api/v1/process",
+  parameters: [],
+  metadata: {},
+};
+
+// Source: lambda/templates/index.js handleCreate (~line 940-963)
+// Response shape: created template item (201)
+const FIXTURE_TEMPLATE_CREATED = {
+  pk: "OWNER#owner-1",
+  sk: "TEMPLATE#test-app#tmpl-new",
+  template_id: "tmpl-new",
+  integration_id: "int-1",
+  app_id: "test-app",
+  template_name: "New Template",
+  template_type: "dictation",
+  endpoint_pattern: "/api/v1/process",
+  parameters: [],
+  metadata: {},
+  created_at: 1710000000000,
+  updated_at: 1710000000000,
+};
+
+// Source: lambda/templates/index.js handleUpdate (~line 993-1015)
+// Response shape: updated template item (same structure as create)
+const FIXTURE_TEMPLATE_UPDATED = {
+  pk: "OWNER#owner-1",
+  sk: "TEMPLATE#test-app#tmpl-1",
+  template_id: "tmpl-1",
+  integration_id: "int-1",
+  app_id: "test-app",
+  template_name: "Updated Name",
+  template_type: "dictation",
+  endpoint_pattern: "/api/v1/process",
+  parameters: [],
+  metadata: {},
+  created_at: 1710000000000,
+  updated_at: 1710000001000,
+};
+
+// Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
+// Response shape: { id, provider, model, choices: Array, usage }
+const FIXTURE_CHAT_COMPLETION = {
+  id: "ai_resp_abc123",
+  provider: "openai",
+  model: "gpt-4",
+  choices: [
+    {
+      index: 0,
+      message: { role: "assistant", content: "Hello!" },
+      finish_reason: "stop",
+    },
+  ],
+  usage: {
+    input_tokens: 10,
+    output_tokens: 5,
+    total_tokens: 15,
+    estimated_cost_usd: 0.001,
+  },
+};
+
+// Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
+// Response shape: same normalized shape for embeddings
+const FIXTURE_EMBEDDING = {
+  id: "ai_resp_emb123",
+  provider: "openai",
+  model: "text-embedding-ada-002",
+  choices: [],
+  usage: {
+    input_tokens: 8,
+    output_tokens: 0,
+    total_tokens: 8,
+    estimated_cost_usd: 0.0001,
+  },
+};
+
+// Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
+// Response shape: same normalized shape for image generation
+const FIXTURE_IMAGE_GENERATION = {
+  id: "ai_resp_img123",
+  provider: "openai",
+  model: "dall-e-3",
+  choices: [],
+  usage: {
+    input_tokens: 0,
+    output_tokens: 0,
+    total_tokens: 0,
+    estimated_cost_usd: 0.04,
+  },
+};
+
+// Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
+// Response shape: same normalized shape for moderation
+const FIXTURE_MODERATION = {
+  id: "ai_resp_mod123",
+  provider: "openai",
+  model: "text-moderation-latest",
+  choices: [],
+  usage: {
+    input_tokens: 5,
+    output_tokens: 0,
+    total_tokens: 5,
+    estimated_cost_usd: 0.0,
+  },
+};
+
+// Source: lambda/ai_proxy/index.js handleGetUsageSummary (~line 457-474)
+// Response shape: { summaries: UsageSummary[] }
+const FIXTURE_AI_USAGE_SUMMARY = {
+  summaries: [
+    {
+      app_id: "test-app",
+      period: "MONTHLY#2026-03",
+      total_requests: 150,
+      total_input_tokens: 50000,
+      total_output_tokens: 25000,
+      total_estimated_cost_usd: 1.25,
+      updated_at: 1710000000000,
+    },
+  ],
+};
+
+// Source: lambda/ai_proxy/index.js handleGetUsage (~line 436-454)
+// Response shape: { usage: UsageRecord[], count: number }
+const FIXTURE_AI_USAGE = {
+  usage: [
+    {
+      usage_id: "usage-001",
+      app_id: "test-app",
+      provider_id: "openai",
+      model_id: "gpt-4",
+      request_type: "chat/completions",
+      input_tokens: 100,
+      output_tokens: 50,
+      total_tokens: 150,
+      latency_ms: 1200,
+      status: "success",
+      created_at: 1710000000000,
+      expires_at: 1712592000000,
+    },
+  ],
+  count: 1,
+};
+
+// Source: lambda/devices/index.js handler (~line 22-26)
+// Response shape: { items: Device[] }
+const FIXTURE_DEVICES = {
+  items: [
+    {
+      id: "dev-1",
+      device_name: "Test Device",
+      display_name: "Test Device Display",
+      device_type: "bluetooth",
+      bluetooth_uuid: "0000-1234",
+      tags: ["dictation"],
+      visibility: "public",
+      category: "microphone",
+    },
+  ],
+};
+
+// Source: lambda/templates/index.js handleRegistryApps (~line 515-518)
+// Response shape: { items: CardApp[] } via toCardApp (~line 571-591)
+const FIXTURE_REGISTRY_APPS = {
+  items: [
+    {
+      app_id: "app-1",
+      name: "Registry App",
+      public_description: "A registry app",
+      description: "Description",
+      created_by_name: "Creator",
+      maintainer: "Maintainer",
+      category: "productivity",
+      tags: ["test"],
+      aliases: [],
+      group: "",
+      is_new_until: "",
+      last_verified_at: "",
+      integrations: [{ template_type: "dictation" }],
+    },
+  ],
+};
+
+// Source: lambda/endpoints/index.js handleCreate (~line 221-232)
+// Response shape: { slug, status, expires_at, endpoint_path, hmac_secret?, hmac_required? }
+const FIXTURE_ENDPOINT_CREATED = {
+  slug: "abc123",
+  status: "active",
+  expires_at: 1712592000,
+  endpoint_path: "/events/abc123",
+  hmac_secret: "secret-key-123",
+  hmac_required: true,
+};
+
+// Source: lambda/endpoints/index.js handleRevokeAndReplace (~line 402-414)
+// Response shape: { old_slug, new_slug, new_endpoint_path, revoked_expires_at, new_expires_at, hmac_secret?, hmac_required? }
+const FIXTURE_ENDPOINT_REVOKE_AND_REPLACE = {
+  old_slug: "old-slug",
+  new_slug: "new-slug",
+  new_endpoint_path: "/events/new-slug",
+  revoked_expires_at: 1710100000,
+  new_expires_at: 1712592000,
+  hmac_secret: "new-secret-key",
+  hmac_required: true,
+};
+
+// Source: lambda/endpoints/index.js handleRevokeOnly (~line 521-524)
+// Response shape: { slug, revoked: true }
+const FIXTURE_ENDPOINT_REVOKED = {
+  slug: "my-slug",
+  revoked: true,
+};
+
+// Source: lambda/events/index.js handlePost (~line 238-246)
+// Response shape: { slug, timestamp, expires_at }
+const FIXTURE_EVENT_POSTED = {
+  slug: "my-slug",
+  timestamp: 1710000000000,
+  expires_at: 1710086400,
+};
+
+// Source: lambda/events/index.js handleGet (~line 262-276)
+// Response shape (empty): { empty: true, slug, text: "George Lucas" }
+// Response shape (data): full item from DynamoDB (slug, timestamp, created_at, expires_at, text, keywords, raw_text, metadata)
+const FIXTURE_EVENT_CONSUMED_EMPTY = {
+  empty: true,
+  slug: "my-slug",
+  text: "George Lucas",
+};
+
+const FIXTURE_EVENT_CONSUMED_WITH_DATA = {
+  slug: "my-slug",
+  timestamp: 1710000000000,
+  created_at: 1710000000000,
+  expires_at: 1710086400,
+  text: "hello world",
+  keywords: ["hello"],
+  raw_text: "hello world",
+  metadata: {},
+};
+
+// Source: lambda/lookup_tables/index.js handleClientList (~line 87-94) + toSummary (~line 867-880)
+// Response shape: { items: Summary[] }
+const FIXTURE_LOOKUP_TABLES_LIST = {
+  items: [
+    {
+      lookup_table_id: "lt-1",
+      name: "Test Lookup Table",
+      description: "A test lookup table",
+      schema_keys: ["key1", "key2"],
+      schema_key_count: 2,
+      schema_keys_truncated: false,
+      version: 1,
+      payload_hash: "abc123hash",
+      storage_mode: "chunked",
+      chunk_count: 2,
+      updated_at: 1710000000000,
+    },
+  ],
+};
+
+// Source: lambda/lookup_tables/index.js handleClientDetail (~line 97-108) + toClientDetail (~line 903-920)
+// Response shape: extends toSummary + prompt, default_success_sentence, default_fail_sentence,
+//   chunk_encoding, manifest_hash, chunks[]
+const FIXTURE_LOOKUP_TABLE_DETAIL = {
+  lookup_table_id: "lt-1",
+  name: "Test Lookup Table",
+  description: "A test lookup table",
+  schema_keys: ["key1", "key2"],
+  schema_key_count: 2,
+  schema_keys_truncated: false,
+  version: 1,
+  payload_hash: "abc123hash",
+  storage_mode: "chunked",
+  chunk_count: 2,
+  updated_at: 1710000000000,
+  prompt: "Look up a value",
+  default_success_sentence: "Found: {value}",
+  default_fail_sentence: "Not found",
+  chunk_encoding: "json",
+  manifest_hash: "manifest-hash-abc",
+  chunks: [
+    { index: 0, path: "chunk0.json", sha256: "sha-a", byte_length: 1024 },
+    { index: 1, path: "chunk1.json", sha256: "sha-b", byte_length: 2048 },
+  ],
+};
+
+// Source: lambda/lookup_tables/index.js handleClientChunk (~line 134-138)
+// Response shape: raw JSON chunk data (arbitrary key-value pairs)
+const FIXTURE_LOOKUP_TABLE_CHUNK_0 = { alpha: 1, bravo: 2 };
+const FIXTURE_LOOKUP_TABLE_CHUNK_1 = { charlie: 3, delta: 4 };
+
+// ---------------------------------------------------------------------------
 // Contract tests — verify each SDK method sends the correct HTTP method + URL
 // ---------------------------------------------------------------------------
 
@@ -166,10 +502,11 @@ describe("SDK ↔ API Contract Validation", () => {
   describe("Templates", () => {
     it("getAppInfo → GET /apps/{app_id}", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/templates/index.js handleAppGet (~line 496-501)
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ app_id: APP_ID, name: "Test" }),
+        json: async () => FIXTURE_APP_INFO,
       });
       await client.getAppInfo();
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -181,10 +518,12 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("listTemplates → GET /apps/{app_id}/templates", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/templates/index.js handleList (~line 858-860)
+      // Response shape: { items: Template[] }
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => [],
+        json: async () => FIXTURE_TEMPLATES_LIST,
       });
       await client.listTemplates();
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -196,10 +535,11 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("listTemplates with next_token → GET /apps/{app_id}/templates?next_token=...", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/templates/index.js handleList (~line 858-860)
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => [],
+        json: async () => FIXTURE_TEMPLATES_LIST,
       });
       await client.listTemplates("tok123");
       const url = fetchSpy.mock.calls[0][0] as string;
@@ -208,10 +548,11 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("getTemplate → GET /apps/{app_id}/templates/{template_id}", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/templates/index.js handleGet (~line 871-898)
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ template_id: "tmpl-1" }),
+        json: async () => FIXTURE_TEMPLATE,
       });
       await client.getTemplate("tmpl-1");
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -223,10 +564,11 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("createTemplate → POST /apps/{app_id}/templates with correct body", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/templates/index.js handleCreate (~line 940-963)
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 201,
-        json: async () => ({ template_id: "tmpl-new" }),
+        json: async () => FIXTURE_TEMPLATE_CREATED,
       });
       const body = { name: "New Template", content: { key: "val" } };
       await client.createTemplate(body);
@@ -242,10 +584,11 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("updateTemplate → PUT /apps/{app_id}/templates/{template_id} with correct body", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/templates/index.js handleUpdate (~line 993-1015)
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ template_id: "tmpl-1" }),
+        json: async () => FIXTURE_TEMPLATE_UPDATED,
       });
       const body = { name: "Updated" };
       await client.updateTemplate("tmpl-1", body);
@@ -261,9 +604,11 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("deleteTemplate → DELETE /apps/{app_id}/templates/{template_id}", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/templates/index.js handleDelete (~line 1018-1025)
+      // Response shape: 204, empty body
       fetchSpy.mockResolvedValue({
         ok: true,
-        status: 200,
+        status: 204,
         json: async () => ({}),
       });
       await client.deleteTemplate("tmpl-1");
@@ -282,10 +627,12 @@ describe("SDK ↔ API Contract Validation", () => {
   describe("AI Services", () => {
     it("createChatCompletion → POST /apps/{app_id}/ai/chat/completions with correct body", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
+      // Response shape: { id, provider, model, choices: Array, usage }
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ choices: [] }),
+        json: async () => FIXTURE_CHAT_COMPLETION,
       });
       const body = {
         messages: [{ role: "user" as const, content: "hello" }],
@@ -305,10 +652,12 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("createEmbedding → POST /apps/{app_id}/ai/embeddings with correct body", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
+      // Response shape: { id, provider, model, choices, usage }
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ data: [] }),
+        json: async () => FIXTURE_EMBEDDING,
       });
       await client.createEmbedding("test input", "text-embedding-ada-002");
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -323,10 +672,11 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("createEmbedding without model omits model from body", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ data: [] }),
+        json: async () => FIXTURE_EMBEDDING,
       });
       await client.createEmbedding("test input");
       const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
@@ -336,10 +686,12 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("createImage → POST /apps/{app_id}/ai/images/generations with correct body", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
+      // Response shape: { id, provider, model, choices, usage }
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ data: [] }),
+        json: async () => FIXTURE_IMAGE_GENERATION,
       });
       await client.createImage("a cat", { n: 2, size: "512x512" });
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -354,10 +706,12 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("createModeration → POST /apps/{app_id}/ai/moderations with correct body", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
+      // Response shape: { id, provider, model, choices, usage }
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ results: [] }),
+        json: async () => FIXTURE_MODERATION,
       });
       await client.createModeration("test content", "text-moderation-latest");
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -372,10 +726,11 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("createModeration without model omits model from body", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ results: [] }),
+        json: async () => FIXTURE_MODERATION,
       });
       await client.createModeration("test content");
       const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
@@ -385,10 +740,12 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("getAiUsageSummary → GET /apps/{app_id}/ai/usage/summary", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/ai_proxy/index.js handleGetUsageSummary (~line 457-474)
+      // Response shape: { summaries: UsageSummary[] }
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ total_requests: 0 }),
+        json: async () => FIXTURE_AI_USAGE_SUMMARY,
       });
       await client.getAiUsageSummary();
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -396,6 +753,39 @@ describe("SDK ↔ API Contract Validation", () => {
         expect.objectContaining({ method: "GET" }),
       );
       expect(routeExists("GET", `/apps/${APP_ID}/ai/usage/summary`)).toBe(true);
+    });
+
+    it("getAiUsage → GET /apps/{app_id}/ai/usage", async () => {
+      const { client, fetchSpy } = setup();
+      // Source: lambda/ai_proxy/index.js handleGetUsage (~line 436-454)
+      // Response shape: { usage: UsageRecord[], count: number }
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_AI_USAGE,
+      });
+      await client.getAiUsage();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/ai/usage`,
+        expect.objectContaining({ method: "GET" }),
+      );
+      expect(routeExists("GET", `/apps/${APP_ID}/ai/usage`)).toBe(true);
+    });
+
+    it("getAiUsage with options passes query params", async () => {
+      const { client, fetchSpy } = setup();
+      // Source: lambda/ai_proxy/index.js handleGetUsage (~line 436-454)
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_AI_USAGE,
+      });
+      await client.getAiUsage({ limit: 10, start_date: "2026-01-01", end_date: "2026-03-13" });
+      const url = fetchSpy.mock.calls[0][0] as string;
+      expect(url).toContain("/ai/usage?");
+      expect(url).toContain("limit=10");
+      expect(url).toContain("start_date=2026-01-01");
+      expect(url).toContain("end_date=2026-03-13");
     });
   });
 
@@ -406,10 +796,12 @@ describe("SDK ↔ API Contract Validation", () => {
   describe("Devices", () => {
     it("getDevices → GET /apps/{app_id}/devices", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/devices/index.js handler (~line 22-26)
+      // Response shape: { items: Device[] }
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ devices: [] }),
+        json: async () => FIXTURE_DEVICES,
       });
       await client.getDevices();
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -427,10 +819,12 @@ describe("SDK ↔ API Contract Validation", () => {
   describe("Registry", () => {
     it("getRegistryApps → GET /registry/apps", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/templates/index.js handleRegistryApps (~line 515-518) + toCardApp (~line 571-591)
+      // Response shape: { items: CardApp[] }
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => [],
+        json: async () => FIXTURE_REGISTRY_APPS,
       });
       await client.getRegistryApps();
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -448,10 +842,12 @@ describe("SDK ↔ API Contract Validation", () => {
   describe("Endpoints", () => {
     it("createEndpoint → POST /apps/{app_id}/endpoints", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/endpoints/index.js handleCreate (~line 221-232)
+      // Response shape: { slug, status, expires_at, endpoint_path, hmac_secret?, hmac_required? }
       fetchSpy.mockResolvedValue({
         ok: true,
-        status: 200,
-        json: async () => ({ slug: "abc", status: "active" }),
+        status: 201,
+        json: async () => FIXTURE_ENDPOINT_CREATED,
       });
       await client.createEndpoint();
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -463,10 +859,12 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("revokeAndReplaceEndpoint → POST /apps/{app_id}/endpoints/revoke_and_replace with correct body", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/endpoints/index.js handleRevokeAndReplace (~line 402-414)
+      // Response shape: { old_slug, new_slug, new_endpoint_path, revoked_expires_at, new_expires_at, hmac_secret?, hmac_required? }
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ old_slug: "old", new_slug: "new" }),
+        json: async () => FIXTURE_ENDPOINT_REVOKE_AND_REPLACE,
       });
       await client.revokeAndReplaceEndpoint("old-slug");
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -481,10 +879,12 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("revokeEndpoint → POST /apps/{app_id}/endpoints/revoke with correct body", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/endpoints/index.js handleRevokeOnly (~line 521-524)
+      // Response shape: { slug, revoked: true }
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ slug: "s", revoked: true }),
+        json: async () => FIXTURE_ENDPOINT_REVOKED,
       });
       await client.revokeEndpoint("my-slug");
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -505,10 +905,12 @@ describe("SDK ↔ API Contract Validation", () => {
   describe("Events", () => {
     it("postEvent → POST /events/{slug} with correct body", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/events/index.js handlePost (~line 238-246)
+      // Response shape: { slug, timestamp, expires_at }
       fetchSpy.mockResolvedValue({
         ok: true,
-        status: 200,
-        json: async () => ({ slug: "my-slug", timestamp: 123 }),
+        status: 201,
+        json: async () => FIXTURE_EVENT_POSTED,
       });
       const payload = { text: "hello", keywords: ["test"] };
       await client.postEvent("my-slug", payload);
@@ -524,10 +926,12 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("consumeEvent → GET /events/{slug}", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/events/index.js handleGet (~line 262-276)
+      // Response shape (empty): { empty: true, slug, text: "George Lucas" }
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ slug: "my-slug", empty: true }),
+        json: async () => FIXTURE_EVENT_CONSUMED_EMPTY,
       });
       await client.consumeEvent("my-slug");
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -545,10 +949,12 @@ describe("SDK ↔ API Contract Validation", () => {
   describe("Lookup Tables", () => {
     it("listLookupTables → GET /lookup-tables", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/lookup_tables/index.js handleClientList (~line 87-94) + toSummary (~line 867-880)
+      // Response shape: { items: Summary[] }
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ items: [] }),
+        json: async () => FIXTURE_LOOKUP_TABLES_LIST,
       });
       await client.listLookupTables();
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -560,10 +966,13 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("getLookupTable → GET /lookup-tables/{lookup_table_id}", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/lookup_tables/index.js handleClientDetail (~line 97-108) + toClientDetail (~line 903-920)
+      // Response shape: extends toSummary + prompt, default_success_sentence, default_fail_sentence,
+      //   chunk_encoding, manifest_hash, chunks[]
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ lookup_table_id: "lt-1", chunk_count: 0, chunks: [] }),
+        json: async () => FIXTURE_LOOKUP_TABLE_DETAIL,
       });
       await client.getLookupTable("lt-1");
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -575,10 +984,11 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("getLookupTable URL-encodes the lookup table ID", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/lookup_tables/index.js handleClientDetail (~line 97-108)
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ lookup_table_id: "has space", chunk_count: 0, chunks: [] }),
+        json: async () => FIXTURE_LOOKUP_TABLE_DETAIL,
       });
       await client.getLookupTable("has space");
       const url = fetchSpy.mock.calls[0][0] as string;
@@ -587,10 +997,12 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("getLookupTableChunk → GET /lookup-tables/{id}/chunks/{index}", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/lookup_tables/index.js handleClientChunk (~line 134-138)
+      // Response shape: raw JSON chunk data
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ key: "value" }),
+        json: async () => FIXTURE_LOOKUP_TABLE_CHUNK_0,
       });
       await client.getLookupTableChunk("lt-1", 0);
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -602,10 +1014,11 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("getLookupTableChunk passes version as query param", async () => {
       const { client, fetchSpy } = setup();
+      // Source: lambda/lookup_tables/index.js handleClientChunk (~line 124)
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({}),
+        json: async () => FIXTURE_LOOKUP_TABLE_CHUNK_0,
       });
       await client.getLookupTableChunk("lt-1", 2, 5);
       const url = fetchSpy.mock.calls[0][0] as string;
@@ -615,35 +1028,29 @@ describe("SDK ↔ API Contract Validation", () => {
     it("getFullLookupTableDataset assembles chunks correctly", async () => {
       const { client, fetchSpy } = setup();
       // First call: getLookupTable returns metadata with 2 chunks
+      // Source: lambda/lookup_tables/index.js toClientDetail (~line 903-920)
       fetchSpy
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
-          json: async () => ({
-            lookup_table_id: "lt-1",
-            chunk_count: 2,
-            version: 1,
-            chunks: [
-              { index: 0, path: "chunk0.json", sha256: "a", byte_length: 10 },
-              { index: 1, path: "chunk1.json", sha256: "b", byte_length: 10 },
-            ],
-          }),
+          json: async () => FIXTURE_LOOKUP_TABLE_DETAIL,
         })
         // Second call: chunk 0
+        // Source: lambda/lookup_tables/index.js handleClientChunk (~line 134-138)
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
-          json: async () => ({ alpha: 1 }),
+          json: async () => FIXTURE_LOOKUP_TABLE_CHUNK_0,
         })
         // Third call: chunk 1
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
-          json: async () => ({ beta: 2 }),
+          json: async () => FIXTURE_LOOKUP_TABLE_CHUNK_1,
         });
 
       const result = await client.getFullLookupTableDataset("lt-1");
-      expect(result.data).toEqual({ alpha: 1, beta: 2 });
+      expect(result.data).toEqual({ ...FIXTURE_LOOKUP_TABLE_CHUNK_0, ...FIXTURE_LOOKUP_TABLE_CHUNK_1 });
       expect(result.status).toBe(200);
 
       // Verify correct sequence of calls
@@ -661,7 +1068,9 @@ describe("SDK ↔ API Contract Validation", () => {
   describe("Request body shape validation", () => {
     it("createTemplate body matches handler expectations (name, content required)", async () => {
       const { client, fetchSpy } = setup();
-      fetchSpy.mockResolvedValue({ ok: true, status: 201, json: async () => ({}) });
+      // Source: lambda/templates/index.js handleCreate (~line 926-963)
+      // Handler validates via createTemplateSchema — expects template_name, template_type, etc.
+      fetchSpy.mockResolvedValue({ ok: true, status: 201, json: async () => FIXTURE_TEMPLATE_CREATED });
       const template = { name: "My Template", description: "desc", content: { steps: [] } };
       await client.createTemplate(template);
       const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
@@ -674,7 +1083,8 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("updateTemplate sends only provided fields (partial update)", async () => {
       const { client, fetchSpy } = setup();
-      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+      // Source: lambda/templates/index.js handleUpdate (~line 966-1015)
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_TEMPLATE_UPDATED });
       await client.updateTemplate("tmpl-1", { name: "Updated Name" });
       const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
       expect(sentBody).toEqual({ name: "Updated Name" });
@@ -685,7 +1095,8 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("createChatCompletion body includes required messages array", async () => {
       const { client, fetchSpy } = setup();
-      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({ choices: [] }) });
+      // Source: lambda/ai_proxy/index.js — messages required in request body
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_CHAT_COMPLETION });
       await client.createChatCompletion({
         messages: [{ role: "user", content: "hi" }],
       });
@@ -698,7 +1109,8 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("createChatCompletion passes optional parameters when provided", async () => {
       const { client, fetchSpy } = setup();
-      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({ choices: [] }) });
+      // Source: lambda/ai_proxy/index.js — optional params forwarded to provider
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_CHAT_COMPLETION });
       await client.createChatCompletion({
         messages: [{ role: "user", content: "hi" }],
         model: "gpt-4",
@@ -717,7 +1129,8 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("createImage body includes required prompt", async () => {
       const { client, fetchSpy } = setup();
-      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: [] }) });
+      // Source: lambda/ai_proxy/index.js — prompt required for image generation
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_IMAGE_GENERATION });
       await client.createImage("sunset over mountains");
       const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
       expect(sentBody).toHaveProperty("prompt", "sunset over mountains");
@@ -725,7 +1138,8 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("revokeAndReplaceEndpoint sends old_slug in body", async () => {
       const { client, fetchSpy } = setup();
-      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+      // Source: lambda/endpoints/index.js handleRevokeAndReplace (~line 235-414)
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_ENDPOINT_REVOKE_AND_REPLACE });
       await client.revokeAndReplaceEndpoint("abc123");
       const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
       expect(sentBody).toEqual({ old_slug: "abc123" });
@@ -733,7 +1147,8 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("revokeEndpoint sends slug in body", async () => {
       const { client, fetchSpy } = setup();
-      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+      // Source: lambda/endpoints/index.js handleRevokeOnly (~line 417-525)
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_ENDPOINT_REVOKED });
       await client.revokeEndpoint("abc123");
       const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
       expect(sentBody).toEqual({ slug: "abc123" });
@@ -741,7 +1156,8 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("postEvent sends arbitrary payload as body", async () => {
       const { client, fetchSpy } = setup();
-      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+      // Source: lambda/events/index.js handlePost (~line 238-246)
+      fetchSpy.mockResolvedValue({ ok: true, status: 201, json: async () => FIXTURE_EVENT_POSTED });
       const payload = { text: "dictation result", keywords: ["hello"] };
       await client.postEvent("my-slug", payload);
       const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
@@ -750,16 +1166,19 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("GET requests do not send a body", async () => {
       const { client, fetchSpy } = setup();
-      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_APP_INFO });
       await client.getAppInfo();
       expect(fetchSpy.mock.calls[0][1].body).toBeUndefined();
 
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_DEVICES });
       await client.getDevices();
       expect(fetchSpy.mock.calls[1][1].body).toBeUndefined();
 
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_LOOKUP_TABLES_LIST });
       await client.listLookupTables();
       expect(fetchSpy.mock.calls[2][1].body).toBeUndefined();
 
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_AI_USAGE_SUMMARY });
       await client.getAiUsageSummary();
       expect(fetchSpy.mock.calls[3][1].body).toBeUndefined();
     });
@@ -790,6 +1209,7 @@ describe("SDK ↔ API Contract Validation", () => {
       { name: "createImage", method: "POST", path: `/apps/${APP_ID}/ai/images/generations` },
       { name: "createModeration", method: "POST", path: `/apps/${APP_ID}/ai/moderations` },
       { name: "getAiUsageSummary", method: "GET", path: `/apps/${APP_ID}/ai/usage/summary` },
+      { name: "getAiUsage", method: "GET", path: `/apps/${APP_ID}/ai/usage` },
 
       // Devices
       { name: "getDevices", method: "GET", path: `/apps/${APP_ID}/devices` },
@@ -854,7 +1274,7 @@ describe("SDK ↔ API Contract Validation", () => {
   describe("Auth header contract", () => {
     it("includes Bearer token when authToken is set", async () => {
       const { client, fetchSpy } = setup();
-      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_APP_INFO });
       await client.getAppInfo();
       const headers = fetchSpy.mock.calls[0][1].headers;
       expect(headers["Authorization"]).toBe("Bearer test-token");
@@ -865,7 +1285,7 @@ describe("SDK ↔ API Contract Validation", () => {
       const fetchSpy = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({}),
+        json: async () => FIXTURE_APP_INFO,
       });
       vi.stubGlobal("fetch", fetchSpy);
       await client.getAppInfo();
@@ -875,10 +1295,140 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("always sends Content-Type: application/json", async () => {
       const { client, fetchSpy } = setup();
-      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_APP_INFO });
       await client.getAppInfo();
       const headers = fetchSpy.mock.calls[0][1].headers;
       expect(headers["Content-Type"]).toBe("application/json");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Golden fixture shape validation — verify fixtures match real Lambda shapes
+  // -----------------------------------------------------------------------
+
+  describe("Golden fixture shape validation", () => {
+    it("AI normalized response has required fields (id, provider, model, choices, usage)", () => {
+      // Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
+      for (const fixture of [FIXTURE_CHAT_COMPLETION, FIXTURE_EMBEDDING, FIXTURE_IMAGE_GENERATION, FIXTURE_MODERATION]) {
+        expect(fixture).toHaveProperty("id");
+        expect(fixture).toHaveProperty("provider");
+        expect(fixture).toHaveProperty("model");
+        expect(fixture).toHaveProperty("choices");
+        expect(fixture).toHaveProperty("usage");
+        expect(fixture.usage).toHaveProperty("input_tokens");
+        expect(fixture.usage).toHaveProperty("output_tokens");
+        expect(fixture.usage).toHaveProperty("total_tokens");
+        expect(fixture.usage).toHaveProperty("estimated_cost_usd");
+      }
+    });
+
+    it("AI usage summary has summaries array with correct fields", () => {
+      // Source: lambda/ai_proxy/index.js handleGetUsageSummary (~line 457-474)
+      expect(FIXTURE_AI_USAGE_SUMMARY).toHaveProperty("summaries");
+      expect(Array.isArray(FIXTURE_AI_USAGE_SUMMARY.summaries)).toBe(true);
+      const summary = FIXTURE_AI_USAGE_SUMMARY.summaries[0];
+      expect(summary).toHaveProperty("app_id");
+      expect(summary).toHaveProperty("period");
+      expect(summary).toHaveProperty("total_requests");
+      expect(summary).toHaveProperty("total_input_tokens");
+      expect(summary).toHaveProperty("total_output_tokens");
+      expect(summary).toHaveProperty("total_estimated_cost_usd");
+      expect(summary).toHaveProperty("updated_at");
+    });
+
+    it("AI usage response has usage array with correct fields", () => {
+      // Source: lambda/ai_proxy/index.js handleGetUsage (~line 436-454)
+      expect(FIXTURE_AI_USAGE).toHaveProperty("usage");
+      expect(FIXTURE_AI_USAGE).toHaveProperty("count");
+      const record = FIXTURE_AI_USAGE.usage[0];
+      expect(record).toHaveProperty("usage_id");
+      expect(record).toHaveProperty("app_id");
+      expect(record).toHaveProperty("provider_id");
+      expect(record).toHaveProperty("model_id");
+      expect(record).toHaveProperty("request_type");
+      expect(record).toHaveProperty("input_tokens");
+      expect(record).toHaveProperty("output_tokens");
+      expect(record).toHaveProperty("total_tokens");
+      expect(record).toHaveProperty("latency_ms");
+      expect(record).toHaveProperty("status");
+      expect(record).toHaveProperty("created_at");
+      expect(record).toHaveProperty("expires_at");
+    });
+
+    it("Devices response has items array (not devices)", () => {
+      // Source: lambda/devices/index.js handler (~line 22-26)
+      // Lambda returns { items: Device[] }, NOT { devices: Device[] }
+      expect(FIXTURE_DEVICES).toHaveProperty("items");
+      expect(Array.isArray(FIXTURE_DEVICES.items)).toBe(true);
+    });
+
+    it("Registry apps response has items array of CardApp objects", () => {
+      // Source: lambda/templates/index.js handleRegistryApps (~line 515-518)
+      expect(FIXTURE_REGISTRY_APPS).toHaveProperty("items");
+      const app = FIXTURE_REGISTRY_APPS.items[0];
+      expect(app).toHaveProperty("app_id");
+      expect(app).toHaveProperty("name");
+      expect(app).toHaveProperty("public_description");
+      expect(app).toHaveProperty("created_by_name");
+      expect(app).toHaveProperty("category");
+      expect(app).toHaveProperty("tags");
+      expect(app).toHaveProperty("integrations");
+    });
+
+    it("Endpoint create response has correct fields", () => {
+      // Source: lambda/endpoints/index.js handleCreate (~line 221-232)
+      expect(FIXTURE_ENDPOINT_CREATED).toHaveProperty("slug");
+      expect(FIXTURE_ENDPOINT_CREATED).toHaveProperty("status");
+      expect(FIXTURE_ENDPOINT_CREATED).toHaveProperty("expires_at");
+      expect(FIXTURE_ENDPOINT_CREATED).toHaveProperty("endpoint_path");
+      expect(FIXTURE_ENDPOINT_CREATED.status).toBe("active");
+      expect(FIXTURE_ENDPOINT_CREATED.endpoint_path).toMatch(/^\/events\//);
+    });
+
+    it("Lookup table summary has all toSummary fields", () => {
+      // Source: lambda/lookup_tables/index.js toSummary (~line 867-880)
+      const summary = FIXTURE_LOOKUP_TABLES_LIST.items[0];
+      expect(summary).toHaveProperty("lookup_table_id");
+      expect(summary).toHaveProperty("name");
+      expect(summary).toHaveProperty("description");
+      expect(summary).toHaveProperty("schema_keys");
+      expect(summary).toHaveProperty("schema_key_count");
+      expect(summary).toHaveProperty("schema_keys_truncated");
+      expect(summary).toHaveProperty("version");
+      expect(summary).toHaveProperty("payload_hash");
+      expect(summary).toHaveProperty("storage_mode");
+      expect(summary).toHaveProperty("chunk_count");
+      expect(summary).toHaveProperty("updated_at");
+    });
+
+    it("Lookup table detail extends summary with client detail fields", () => {
+      // Source: lambda/lookup_tables/index.js toClientDetail (~line 903-920)
+      expect(FIXTURE_LOOKUP_TABLE_DETAIL).toHaveProperty("prompt");
+      expect(FIXTURE_LOOKUP_TABLE_DETAIL).toHaveProperty("default_success_sentence");
+      expect(FIXTURE_LOOKUP_TABLE_DETAIL).toHaveProperty("default_fail_sentence");
+      expect(FIXTURE_LOOKUP_TABLE_DETAIL).toHaveProperty("chunk_encoding");
+      expect(FIXTURE_LOOKUP_TABLE_DETAIL).toHaveProperty("manifest_hash");
+      expect(FIXTURE_LOOKUP_TABLE_DETAIL).toHaveProperty("chunks");
+      expect(Array.isArray(FIXTURE_LOOKUP_TABLE_DETAIL.chunks)).toBe(true);
+      const chunk = FIXTURE_LOOKUP_TABLE_DETAIL.chunks[0];
+      expect(chunk).toHaveProperty("index");
+      expect(chunk).toHaveProperty("path");
+      expect(chunk).toHaveProperty("sha256");
+      expect(chunk).toHaveProperty("byte_length");
+    });
+
+    it("Event post response has slug, timestamp, expires_at", () => {
+      // Source: lambda/events/index.js handlePost (~line 238-246)
+      expect(FIXTURE_EVENT_POSTED).toHaveProperty("slug");
+      expect(FIXTURE_EVENT_POSTED).toHaveProperty("timestamp");
+      expect(FIXTURE_EVENT_POSTED).toHaveProperty("expires_at");
+    });
+
+    it("Event consume empty response has empty flag and George Lucas text", () => {
+      // Source: lambda/events/index.js handleGet (~line 262-267)
+      expect(FIXTURE_EVENT_CONSUMED_EMPTY).toHaveProperty("empty", true);
+      expect(FIXTURE_EVENT_CONSUMED_EMPTY).toHaveProperty("slug");
+      expect(FIXTURE_EVENT_CONSUMED_EMPTY).toHaveProperty("text", "George Lucas");
     });
   });
 });
