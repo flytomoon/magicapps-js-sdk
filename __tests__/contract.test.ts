@@ -195,7 +195,6 @@ const FIXTURE_TEMPLATE = {
   app_id: "test-app",
   template_name: "Test Template",
   template_type: "dictation",
-  source_mode: "slug_endpoint",
   endpoint_pattern: "/api/v1/process",
   parameters: [],
   metadata: {},
@@ -212,7 +211,7 @@ const FIXTURE_TEMPLATE_CREATED = {
   template_name: "New Template",
   template_type: "dictation",
   endpoint_pattern: "/api/v1/process",
-  source_mode: "slug_endpoint",
+  http_get_mode: undefined,
   poll_mode: undefined,
   timeout_ms: undefined,
   max_attempts: undefined,
@@ -238,7 +237,7 @@ const FIXTURE_TEMPLATE_UPDATED = {
   template_name: "Updated Name",
   template_type: "dictation",
   endpoint_pattern: "/api/v1/process",
-  source_mode: "slug_endpoint",
+  http_get_mode: undefined,
   poll_mode: undefined,
   timeout_ms: undefined,
   max_attempts: undefined,
@@ -253,7 +252,7 @@ const FIXTURE_TEMPLATE_UPDATED = {
 };
 
 // Source: lambda/templates/index.js handleCreate (~line 995-1027)
-// Response shape: created template with source_mode=api_poll and all poll config fields
+// Response shape: created template with http_get_mode=input_source_poll and all poll config fields
 const FIXTURE_TEMPLATE_API_POLL = {
   pk: "OWNER#owner-1",
   sk: "TEMPLATE#test-app#tmpl-poll",
@@ -263,7 +262,7 @@ const FIXTURE_TEMPLATE_API_POLL = {
   template_name: "API Poll Template",
   template_type: "http_get",
   endpoint_pattern: "https://api.example.com/status",
-  source_mode: "api_poll",
+  http_get_mode: "input_source_poll",
   poll_mode: "short_poll",
   timeout_ms: 30000,
   max_attempts: 10,
@@ -285,7 +284,6 @@ const FIXTURE_TEMPLATE_HOSTED_INBOUND = {
   template_name: "Hosted Inbound Endpoint",
   template_type: "slug_endpoint",
   group: "custom_core",
-  source_mode: "slug_endpoint",
   endpoint_pattern: "/events/{slug}",
   parameters: [
     { name: "text", type: "dynamic", required: true, example: "Incoming payload" },
@@ -1484,11 +1482,12 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(chunk).toHaveProperty("byte_length");
     });
 
-    it("Template created fixture has source_mode field", () => {
+    it("Template created fixture does not have deprecated source_mode field", () => {
       // Source: lambda/templates/index.js handleCreate (~line 969-1022)
-      expect(FIXTURE_TEMPLATE_CREATED).toHaveProperty("source_mode", "slug_endpoint");
-      expect(FIXTURE_TEMPLATE).toHaveProperty("source_mode", "slug_endpoint");
-      expect(FIXTURE_TEMPLATE_UPDATED).toHaveProperty("source_mode", "slug_endpoint");
+      // source_mode was replaced by http_get_mode (never deployed to production)
+      expect(FIXTURE_TEMPLATE_CREATED).not.toHaveProperty("source_mode");
+      expect(FIXTURE_TEMPLATE).not.toHaveProperty("source_mode");
+      expect(FIXTURE_TEMPLATE_UPDATED).not.toHaveProperty("source_mode");
     });
 
     it("Template fixtures have status field matching handler default", () => {
@@ -1498,9 +1497,9 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("status", "beta");
     });
 
-    it("API poll template fixture has all poll config fields", () => {
+    it("API poll template fixture has http_get_mode and all poll config fields", () => {
       // Source: lambda/templates/index.js handleCreate (~line 969-1022)
-      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("source_mode", "api_poll");
+      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("http_get_mode", "input_source_poll");
       expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("poll_mode", "short_poll");
       expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("timeout_ms");
       expect(typeof FIXTURE_TEMPLATE_API_POLL.timeout_ms).toBe("number");
@@ -1513,9 +1512,9 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("response_path", "$.data.result");
     });
 
-    it("Hosted inbound template fixture has correct source_mode and core fields", () => {
+    it("Hosted inbound template fixture has correct core fields (no source_mode)", () => {
       // Source: lambda/templates/registryData.js (~line 184-230)
-      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("source_mode", "slug_endpoint");
+      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).not.toHaveProperty("source_mode");
       expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("template_type", "slug_endpoint");
       expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("group", "custom_core");
       expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("endpoint_pattern", "/events/{slug}");

@@ -151,25 +151,25 @@ export interface Template {
   app_id?: string;
   template_name?: string;
   template_type?: 'slug_endpoint' | 'url_scheme' | 'http_post' | 'http_get';
-  /** > */
-  source_mode?: 'slug_endpoint' | 'api_poll';
-  /** Configuration for api_poll source_mode. Only applies when source_mode=api_poll. */
+  /** HTTP GET behavior mode: fire_and_forget (default) or input_source_poll. Only applies to http_get templates. */
+  http_get_mode?: 'fire_and_forget' | 'input_source_poll';
+  /** Configuration for input_source_poll http_get_mode. Only applies when http_get_mode=input_source_poll. */
   poll_config?: Record<string, unknown>;
-  /** > */
+  /** Polling strategy when http_get_mode is input_source_poll. */
   poll_mode?: 'one_shot' | 'short_poll' | 'continuous';
-  /** Maximum time in milliseconds to wait for a result (1ms–300000ms / 5 min). */
+  /** Maximum time in milliseconds to wait for a result (1ms-300000ms / 5 min). */
   timeout_ms?: number;
-  /** Maximum number of poll attempts before giving up (1–100). */
+  /** Maximum number of poll attempts before giving up (1-100). */
   max_attempts?: number;
-  /** Delay in milliseconds between poll attempts (0–60000ms). */
+  /** Delay in milliseconds between poll attempts (0-60000ms). */
   backoff_ms?: number;
-  /** > */
+  /** Behavior when poll returns empty result. */
   empty_result_behavior?: 'fail' | 'retry' | 'fallback_to_speech';
-  /** API-poll-specific response parsing configuration. Only applies when source_mode=api_poll. */
+  /** API poll response parsing configuration. Only applies when http_get_mode=input_source_poll. */
   api_poll_config?: Record<string, unknown>;
-  /** > */
+  /** How the poll response body is interpreted. */
   response_type?: 'text' | 'json';
-  /** > */
+  /** JSONPath expression to extract value from poll response when response_type is json. */
   response_path?: string;
   /** High-level grouping (e.g., custom_core, built_integration) */
   group?: string;

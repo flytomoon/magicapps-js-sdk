@@ -27,9 +27,9 @@ export interface Template {
   name: string;
   description?: string;
   content: Record<string, unknown>;
-  /** How the template's data source is provided: slug_endpoint (default) or api_poll. */
-  source_mode?: "slug_endpoint" | "api_poll";
-  /** Polling strategy when source_mode is api_poll. */
+  /** HTTP GET behavior mode: fire_and_forget (default) or input_source_poll. Only applies to http_get templates. */
+  http_get_mode?: "fire_and_forget" | "input_source_poll";
+  /** Polling strategy when http_get_mode is input_source_poll. */
   poll_mode?: "one_shot" | "short_poll" | "continuous";
   /** Maximum time (ms) to wait for a poll response. */
   timeout_ms?: number;
