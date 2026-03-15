@@ -195,12 +195,13 @@ const FIXTURE_TEMPLATE = {
   app_id: "test-app",
   template_name: "Test Template",
   template_type: "dictation",
+  source_mode: "slug_endpoint",
   endpoint_pattern: "/api/v1/process",
   parameters: [],
   metadata: {},
 };
 
-// Source: lambda/templates/index.js handleCreate (~line 940-963)
+// Source: lambda/templates/index.js handleCreate (~line 969-1022)
 // Response shape: created template item (201)
 const FIXTURE_TEMPLATE_CREATED = {
   pk: "OWNER#owner-1",
@@ -211,13 +212,21 @@ const FIXTURE_TEMPLATE_CREATED = {
   template_name: "New Template",
   template_type: "dictation",
   endpoint_pattern: "/api/v1/process",
+  source_mode: "slug_endpoint",
+  poll_mode: undefined,
+  timeout_ms: undefined,
+  max_attempts: undefined,
+  backoff_ms: undefined,
+  empty_result_behavior: undefined,
+  response_type: undefined,
+  response_path: undefined,
   parameters: [],
   metadata: {},
   created_at: 1710000000000,
   updated_at: 1710000000000,
 };
 
-// Source: lambda/templates/index.js handleUpdate (~line 993-1015)
+// Source: lambda/templates/index.js handleUpdate (~line 1025-1077)
 // Response shape: updated template item (same structure as create)
 const FIXTURE_TEMPLATE_UPDATED = {
   pk: "OWNER#owner-1",
@@ -228,10 +237,66 @@ const FIXTURE_TEMPLATE_UPDATED = {
   template_name: "Updated Name",
   template_type: "dictation",
   endpoint_pattern: "/api/v1/process",
+  source_mode: "slug_endpoint",
+  poll_mode: undefined,
+  timeout_ms: undefined,
+  max_attempts: undefined,
+  backoff_ms: undefined,
+  empty_result_behavior: undefined,
+  response_type: undefined,
+  response_path: undefined,
   parameters: [],
   metadata: {},
   created_at: 1710000000000,
   updated_at: 1710000001000,
+};
+
+// Source: lambda/templates/index.js handleCreate (~line 969-1022)
+// Response shape: created template with source_mode=api_poll and all poll config fields
+const FIXTURE_TEMPLATE_API_POLL = {
+  pk: "OWNER#owner-1",
+  sk: "TEMPLATE#test-app#tmpl-poll",
+  template_id: "tmpl-poll",
+  integration_id: "int-poll",
+  app_id: "test-app",
+  template_name: "API Poll Template",
+  template_type: "http_get",
+  endpoint_pattern: "https://api.example.com/status",
+  source_mode: "api_poll",
+  poll_mode: "short_poll",
+  timeout_ms: 30000,
+  max_attempts: 10,
+  backoff_ms: 2000,
+  empty_result_behavior: "retry",
+  response_type: "json",
+  response_path: "$.data.result",
+  parameters: [],
+  metadata: {},
+  created_at: 1710000000000,
+  updated_at: 1710000000000,
+};
+
+// Source: lambda/templates/registryData.js (~line 184-230)
+// Response shape: hosted inbound template from core registry data
+const FIXTURE_TEMPLATE_HOSTED_INBOUND = {
+  id: "dev.magicapps.inbound.slug_endpoint",
+  template_name: "Hosted Inbound Endpoint",
+  template_type: "slug_endpoint",
+  group: "custom_core",
+  source_mode: "slug_endpoint",
+  endpoint_pattern: "/events/{slug}",
+  parameters: [
+    { name: "text", type: "dynamic", required: true, example: "Incoming payload" },
+  ],
+  integration_id: "magicapps.inbound",
+  integration_name: "Hosted Inbound Endpoint",
+  provider: "Magic Apps",
+  description: "A managed inbound endpoint where third parties POST data to a Magic Apps-hosted URL. The client consumes received events on trigger.",
+  category: "messaging",
+  tags: ["inbound", "slug", "webhook"],
+  status: "unreleased",
+  version: "1.0.0",
+  is_latest: true,
 };
 
 // Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
@@ -1415,6 +1480,40 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(chunk).toHaveProperty("path");
       expect(chunk).toHaveProperty("sha256");
       expect(chunk).toHaveProperty("byte_length");
+    });
+
+    it("Template created fixture has source_mode field", () => {
+      // Source: lambda/templates/index.js handleCreate (~line 969-1022)
+      expect(FIXTURE_TEMPLATE_CREATED).toHaveProperty("source_mode", "slug_endpoint");
+      expect(FIXTURE_TEMPLATE).toHaveProperty("source_mode", "slug_endpoint");
+      expect(FIXTURE_TEMPLATE_UPDATED).toHaveProperty("source_mode", "slug_endpoint");
+    });
+
+    it("API poll template fixture has all poll config fields", () => {
+      // Source: lambda/templates/index.js handleCreate (~line 969-1022)
+      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("source_mode", "api_poll");
+      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("poll_mode", "short_poll");
+      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("timeout_ms");
+      expect(typeof FIXTURE_TEMPLATE_API_POLL.timeout_ms).toBe("number");
+      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("max_attempts");
+      expect(typeof FIXTURE_TEMPLATE_API_POLL.max_attempts).toBe("number");
+      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("backoff_ms");
+      expect(typeof FIXTURE_TEMPLATE_API_POLL.backoff_ms).toBe("number");
+      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("empty_result_behavior", "retry");
+      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("response_type", "json");
+      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("response_path", "$.data.result");
+    });
+
+    it("Hosted inbound template fixture has correct source_mode and core fields", () => {
+      // Source: lambda/templates/registryData.js (~line 184-230)
+      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("source_mode", "slug_endpoint");
+      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("template_type", "slug_endpoint");
+      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("group", "custom_core");
+      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("endpoint_pattern", "/events/{slug}");
+      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("parameters");
+      expect(Array.isArray(FIXTURE_TEMPLATE_HOSTED_INBOUND.parameters)).toBe(true);
+      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND.parameters[0]).toHaveProperty("name", "text");
+      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("status", "unreleased");
     });
 
     it("Event post response has slug, timestamp, expires_at", () => {

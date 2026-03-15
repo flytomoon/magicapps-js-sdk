@@ -167,6 +167,22 @@ export interface Template {
   visibility?: TemplateVisibility;
   allowed_app_ids?: string[];
   endpoint_pattern?: string;
+  /** How the template's data source is provided: slug_endpoint (default) or api_poll. */
+  source_mode?: 'slug_endpoint' | 'api_poll';
+  /** Polling strategy when source_mode is api_poll. */
+  poll_mode?: 'one_shot' | 'short_poll' | 'continuous';
+  /** Maximum time (ms) to wait for a poll response. */
+  timeout_ms?: number;
+  /** Maximum number of poll attempts. */
+  max_attempts?: number;
+  /** Delay (ms) between poll retries. */
+  backoff_ms?: number;
+  /** Behavior when poll returns empty result. */
+  empty_result_behavior?: 'fail' | 'retry' | 'fallback_to_speech';
+  /** How the poll response body is interpreted. */
+  response_type?: 'text' | 'json';
+  /** JSONPath expression to extract value from poll response when response_type is json. */
+  response_path?: string;
   parameters?: TemplateParameter[];
   metadata?: Record<string, unknown>;
   created_at?: number;
