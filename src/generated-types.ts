@@ -71,7 +71,18 @@ export interface LookupTableChunk {
   byte_length?: number;
 }
 
-export interface LookupTableDetail extends LookupTableSummary, LookupTableChunk {
+export interface LookupTableDetail {
+  lookup_table_id?: string;
+  name?: string;
+  description?: string | null;
+  schema_keys?: string[];
+  schema_key_count?: number;
+  schema_keys_truncated?: boolean;
+  version?: number;
+  payload_hash?: string;
+  storage_mode?: string;
+  chunk_count?: number;
+  updated_at?: number;
   /** Present on detail only; omitted from summary list. */
   prompt?: string | null;
   /** Optional templated success sentence using {{path.to.key}} tokens. */
@@ -83,7 +94,27 @@ export interface LookupTableDetail extends LookupTableSummary, LookupTableChunk 
   chunks?: LookupTableChunk[];
 }
 
-export interface AdminLookupTableDetail extends LookupTableDetail {
+export interface AdminLookupTableDetail {
+  lookup_table_id?: string;
+  name?: string;
+  description?: string | null;
+  schema_keys?: string[];
+  schema_key_count?: number;
+  schema_keys_truncated?: boolean;
+  version?: number;
+  payload_hash?: string;
+  storage_mode?: string;
+  chunk_count?: number;
+  updated_at?: number;
+  /** Present on detail only; omitted from summary list. */
+  prompt?: string | null;
+  /** Optional templated success sentence using {{path.to.key}} tokens. */
+  default_success_sentence?: string | null;
+  /** Optional fallback fail sentence. */
+  default_fail_sentence?: string | null;
+  chunk_encoding?: string;
+  manifest_hash?: string;
+  chunks?: LookupTableChunk[];
   allowlisted_apps?: string[];
   client_targets?: string[];
   status?: string;
