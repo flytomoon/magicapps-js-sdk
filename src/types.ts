@@ -43,6 +43,8 @@ export interface Template {
   response_type?: "text" | "json";
   /** JSONPath expression to extract value from poll response when response_type is json. */
   response_path?: string;
+  /** Template lifecycle status: beta (default), active, or unreleased. */
+  status?: "beta" | "active" | "unreleased";
   created_at: string;
   updated_at: string;
 }

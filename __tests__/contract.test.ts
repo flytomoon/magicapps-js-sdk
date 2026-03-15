@@ -220,14 +220,15 @@ const FIXTURE_TEMPLATE_CREATED = {
   empty_result_behavior: undefined,
   response_type: undefined,
   response_path: undefined,
+  status: "beta",
   parameters: [],
   metadata: {},
   created_at: 1710000000000,
   updated_at: 1710000000000,
 };
 
-// Source: lambda/templates/index.js handleUpdate (~line 1025-1077)
-// Response shape: updated template item (same structure as create)
+// Source: lambda/templates/index.js handleUpdate (~line 1065-1100)
+// Response shape: updated template item (merged existing + body fields, explicit field list)
 const FIXTURE_TEMPLATE_UPDATED = {
   pk: "OWNER#owner-1",
   sk: "TEMPLATE#test-app#tmpl-1",
@@ -245,13 +246,13 @@ const FIXTURE_TEMPLATE_UPDATED = {
   empty_result_behavior: undefined,
   response_type: undefined,
   response_path: undefined,
+  status: "beta",
   parameters: [],
   metadata: {},
-  created_at: 1710000000000,
   updated_at: 1710000001000,
 };
 
-// Source: lambda/templates/index.js handleCreate (~line 969-1022)
+// Source: lambda/templates/index.js handleCreate (~line 995-1027)
 // Response shape: created template with source_mode=api_poll and all poll config fields
 const FIXTURE_TEMPLATE_API_POLL = {
   pk: "OWNER#owner-1",
@@ -270,6 +271,7 @@ const FIXTURE_TEMPLATE_API_POLL = {
   empty_result_behavior: "retry",
   response_type: "json",
   response_path: "$.data.result",
+  status: "beta",
   parameters: [],
   metadata: {},
   created_at: 1710000000000,
@@ -453,7 +455,7 @@ const FIXTURE_ENDPOINT_CREATED = {
   hmac_required: true,
 };
 
-// Source: lambda/endpoints/index.js handleRevokeAndReplace (~line 402-414)
+// Source: lambda/endpoints/index.js handleRevokeAndReplace (~line 425-437)
 // Response shape: { old_slug, new_slug, new_endpoint_path, revoked_expires_at, new_expires_at, hmac_secret?, hmac_required? }
 const FIXTURE_ENDPOINT_REVOKE_AND_REPLACE = {
   old_slug: "old-slug",
@@ -1487,6 +1489,13 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(FIXTURE_TEMPLATE_CREATED).toHaveProperty("source_mode", "slug_endpoint");
       expect(FIXTURE_TEMPLATE).toHaveProperty("source_mode", "slug_endpoint");
       expect(FIXTURE_TEMPLATE_UPDATED).toHaveProperty("source_mode", "slug_endpoint");
+    });
+
+    it("Template fixtures have status field matching handler default", () => {
+      // Source: lambda/templates/index.js handleCreate (~line 1012) — status: body.status || "beta"
+      expect(FIXTURE_TEMPLATE_CREATED).toHaveProperty("status", "beta");
+      expect(FIXTURE_TEMPLATE_UPDATED).toHaveProperty("status", "beta");
+      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("status", "beta");
     });
 
     it("API poll template fixture has all poll config fields", () => {
