@@ -153,6 +153,8 @@ export interface Template {
   template_type?: 'slug_endpoint' | 'url_scheme' | 'http_post' | 'http_get';
   /** HTTP GET behavior mode: fire_and_forget (default) or input_source_poll. Only applies to http_get templates. */
   http_get_mode?: 'fire_and_forget' | 'input_source_poll';
+  /** Auto-derived behavioral classification. Read-only — computed from template_type, http_get_mode, and template identity. */
+  behavior_role?: 'outbound_send' | 'inbound_consume' | 'input_source_poll';
   /** Configuration for input_source_poll http_get_mode. Only applies when http_get_mode=input_source_poll. */
   poll_config?: Record<string, unknown>;
   /** Polling strategy when http_get_mode is input_source_poll. */

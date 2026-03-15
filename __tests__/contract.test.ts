@@ -200,7 +200,7 @@ const FIXTURE_TEMPLATE = {
   metadata: {},
 };
 
-// Source: lambda/templates/index.js handleCreate (~line 969-1022)
+// Source: lambda/templates/index.js handleCreate (~line 969-1030)
 // Response shape: created template item (201)
 const FIXTURE_TEMPLATE_CREATED = {
   pk: "OWNER#owner-1",
@@ -212,6 +212,7 @@ const FIXTURE_TEMPLATE_CREATED = {
   template_type: "dictation",
   endpoint_pattern: "/api/v1/process",
   http_get_mode: undefined,
+  behavior_role: "outbound_send",
   poll_mode: undefined,
   timeout_ms: undefined,
   max_attempts: undefined,
@@ -226,7 +227,7 @@ const FIXTURE_TEMPLATE_CREATED = {
   updated_at: 1710000000000,
 };
 
-// Source: lambda/templates/index.js handleUpdate (~line 1065-1100)
+// Source: lambda/templates/index.js handleUpdate (~line 1065-1105)
 // Response shape: updated template item (merged existing + body fields, explicit field list)
 const FIXTURE_TEMPLATE_UPDATED = {
   pk: "OWNER#owner-1",
@@ -238,6 +239,7 @@ const FIXTURE_TEMPLATE_UPDATED = {
   template_type: "dictation",
   endpoint_pattern: "/api/v1/process",
   http_get_mode: undefined,
+  behavior_role: "outbound_send",
   poll_mode: undefined,
   timeout_ms: undefined,
   max_attempts: undefined,
@@ -263,6 +265,7 @@ const FIXTURE_TEMPLATE_API_POLL = {
   template_type: "http_get",
   endpoint_pattern: "https://api.example.com/status",
   http_get_mode: "input_source_poll",
+  behavior_role: "input_source_poll",
   poll_mode: "short_poll",
   timeout_ms: 30000,
   max_attempts: 10,
@@ -283,6 +286,7 @@ const FIXTURE_TEMPLATE_HOSTED_INBOUND = {
   id: "dev.magicapps.inbound.slug_endpoint",
   template_name: "Hosted Inbound Endpoint",
   template_type: "slug_endpoint",
+  behavior_role: "inbound_consume",
   group: "custom_core",
   endpoint_pattern: "/events/{slug}",
   parameters: [
