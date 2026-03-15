@@ -120,6 +120,26 @@ export interface Template {
   app_id?: string;
   template_name?: string;
   template_type?: 'slug_endpoint' | 'url_scheme' | 'http_post' | 'http_get';
+  /** > */
+  source_mode?: 'slug_endpoint' | 'api_poll';
+  /** Configuration for api_poll source_mode. Only applies when source_mode=api_poll. */
+  poll_config?: Record<string, unknown>;
+  /** > */
+  poll_mode?: 'one_shot' | 'short_poll' | 'continuous';
+  /** Maximum time in milliseconds to wait for a result (1ms–300000ms / 5 min). */
+  timeout_ms?: number;
+  /** Maximum number of poll attempts before giving up (1–100). */
+  max_attempts?: number;
+  /** Delay in milliseconds between poll attempts (0–60000ms). */
+  backoff_ms?: number;
+  /** > */
+  empty_result_behavior?: 'fail' | 'retry' | 'fallback_to_speech';
+  /** API-poll-specific response parsing configuration. Only applies when source_mode=api_poll. */
+  api_poll_config?: Record<string, unknown>;
+  /** > */
+  response_type?: 'text' | 'json';
+  /** > */
+  response_path?: string;
   /** High-level grouping (e.g., custom_core, built_integration) */
   group?: string;
   /** End-user facing description shown publicly */
@@ -167,22 +187,6 @@ export interface Template {
   visibility?: TemplateVisibility;
   allowed_app_ids?: string[];
   endpoint_pattern?: string;
-  /** How the template's data source is provided: slug_endpoint (default) or api_poll. */
-  source_mode?: 'slug_endpoint' | 'api_poll';
-  /** Polling strategy when source_mode is api_poll. */
-  poll_mode?: 'one_shot' | 'short_poll' | 'continuous';
-  /** Maximum time (ms) to wait for a poll response. */
-  timeout_ms?: number;
-  /** Maximum number of poll attempts. */
-  max_attempts?: number;
-  /** Delay (ms) between poll retries. */
-  backoff_ms?: number;
-  /** Behavior when poll returns empty result. */
-  empty_result_behavior?: 'fail' | 'retry' | 'fallback_to_speech';
-  /** How the poll response body is interpreted. */
-  response_type?: 'text' | 'json';
-  /** JSONPath expression to extract value from poll response when response_type is json. */
-  response_path?: string;
   parameters?: TemplateParameter[];
   metadata?: Record<string, unknown>;
   created_at?: number;
