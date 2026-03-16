@@ -45,7 +45,7 @@ export interface AIProvider {
   updated_at?: string;
 }
 
-export interface Error {
+export interface ErrorResponse {
   error: string;
   message: string;
 }
