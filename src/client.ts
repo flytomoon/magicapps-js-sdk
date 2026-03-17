@@ -59,10 +59,11 @@ export class MagicAppsClient {
     if (nextToken) params.set("next_token", nextToken);
     const query = params.toString();
     const path = `/apps/${this.appId}/templates${query ? `?${query}` : ""}`;
-    return this.request<PaginatedResponse<Template>>(
+    const response = await this.request<PaginatedResponse<Template>>(
       "GET",
       path,
-    ) as Promise<PaginatedResponse<Template>>;
+    );
+    return response.data;
   }
 
   /** Get a specific template by ID. */
