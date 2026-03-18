@@ -152,6 +152,8 @@ export interface Template {
   template_name?: string;
   template_type?: 'slug_endpoint' | 'url_scheme' | 'http_post' | 'http_get';
   /** > */
+  slug_mode?: 'outbound_send' | 'inbound_consume';
+  /** > */
   http_get_mode?: 'fire_and_forget' | 'input_source_poll';
   /** > */
   behavior_role?: 'outbound_send' | 'inbound_consume' | 'input_source_poll';
@@ -233,6 +235,7 @@ export interface AppIntegration {
   template_id?: string;
   template_name?: string;
   template_type?: 'slug_endpoint' | 'url_scheme' | 'http_post' | 'http_get';
+  slug_mode?: 'outbound_send' | 'inbound_consume';
   endpoint_input_mode?: string;
   endpoint_input_placeholder?: string;
   show_endpoint_input?: boolean;
@@ -256,6 +259,7 @@ export interface AppIntegrationV2 {
   template_id?: string;
   template_name?: string;
   template_type?: 'slug_endpoint' | 'url_scheme' | 'http_post' | 'http_get';
+  slug_mode?: 'outbound_send' | 'inbound_consume';
   endpoint_input_mode?: string;
   endpoint_input_placeholder?: string;
   show_endpoint_input?: boolean;
