@@ -157,6 +157,8 @@ export interface Template {
   http_get_mode?: 'fire_and_forget' | 'input_source_poll';
   /** > */
   behavior_role?: 'outbound_send' | 'inbound_consume' | 'input_source_poll';
+  /** > */
+  inbound_value_field?: string;
   /** Configuration for input_source_poll http_get_mode. Only applies when http_get_mode=input_source_poll. */
   poll_config?: Record<string, unknown>;
   /** > */
@@ -236,6 +238,18 @@ export interface AppIntegration {
   template_name?: string;
   template_type?: 'slug_endpoint' | 'url_scheme' | 'http_post' | 'http_get';
   slug_mode?: 'outbound_send' | 'inbound_consume';
+  behavior_role?: 'outbound_send' | 'inbound_consume' | 'input_source_poll';
+  /** > */
+  inbound_value_field?: string;
+  http_get_mode?: 'fire_and_forget' | 'input_source_poll';
+  poll_mode?: 'one_shot' | 'short_poll' | 'continuous';
+  timeout_ms?: number;
+  max_attempts?: number;
+  backoff_ms?: number;
+  empty_result_behavior?: 'fail' | 'retry' | 'fallback_to_speech';
+  response_type?: 'text' | 'json';
+  /** Dot-path to extract value from JSON responses (for example, data.transcription.text). */
+  response_path?: string;
   endpoint_input_mode?: string;
   endpoint_input_placeholder?: string;
   show_endpoint_input?: boolean;
@@ -260,6 +274,18 @@ export interface AppIntegrationV2 {
   template_name?: string;
   template_type?: 'slug_endpoint' | 'url_scheme' | 'http_post' | 'http_get';
   slug_mode?: 'outbound_send' | 'inbound_consume';
+  behavior_role?: 'outbound_send' | 'inbound_consume' | 'input_source_poll';
+  /** > */
+  inbound_value_field?: string;
+  http_get_mode?: 'fire_and_forget' | 'input_source_poll';
+  poll_mode?: 'one_shot' | 'short_poll' | 'continuous';
+  timeout_ms?: number;
+  max_attempts?: number;
+  backoff_ms?: number;
+  empty_result_behavior?: 'fail' | 'retry' | 'fallback_to_speech';
+  response_type?: 'text' | 'json';
+  /** Dot-path to extract value from JSON responses (for example, data.transcription.text). */
+  response_path?: string;
   endpoint_input_mode?: string;
   endpoint_input_placeholder?: string;
   show_endpoint_input?: boolean;
