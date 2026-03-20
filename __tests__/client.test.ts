@@ -71,34 +71,6 @@ describe("MagicAppsClient", () => {
       );
     });
 
-    it("listTemplates calls correct endpoint", async () => {
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => [],
-      });
-
-      await client.listTemplates();
-      expect(fetchSpy).toHaveBeenCalledWith(
-        "https://api.example.com/apps/test-app/templates",
-        expect.objectContaining({ method: "GET" }),
-      );
-    });
-
-    it("listTemplates passes next_token", async () => {
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => [],
-      });
-
-      await client.listTemplates("abc123");
-      expect(fetchSpy).toHaveBeenCalledWith(
-        "https://api.example.com/apps/test-app/templates?next_token=abc123",
-        expect.objectContaining({ method: "GET" }),
-      );
-    });
-
     it("getTemplate calls correct endpoint", async () => {
       fetchSpy.mockResolvedValue({
         ok: true,

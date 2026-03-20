@@ -237,6 +237,18 @@ export interface DeviceCatalogResponse {
   count?: number;
 }
 
+// --- Auth Types ---
+
+/** Response from authentication token exchange or refresh. */
+export interface AuthTokenResponse {
+  user?: Record<string, unknown>;
+  id?: string;
+  email?: string;
+  status?: string;
+  token?: string;
+  refresh_token?: string;
+}
+
 // --- Registry Types ---
 
 /** An app in the registry catalog. */
