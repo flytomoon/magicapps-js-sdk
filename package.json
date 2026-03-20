@@ -1,6 +1,6 @@
 {
   "name": "@magic-apps-cloud/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Magic Apps Cloud SDK for TypeScript/JavaScript",
   "type": "module",
   "main": "./dist/index.js",
@@ -25,7 +25,14 @@
     "docs": "typedoc",
     "docs:watch": "typedoc --watch"
   },
-  "keywords": ["magicapps", "sdk", "api", "backend", "serverless", "paas"],
+  "keywords": [
+    "magicapps",
+    "sdk",
+    "api",
+    "backend",
+    "serverless",
+    "paas"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
