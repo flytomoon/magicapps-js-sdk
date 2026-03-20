@@ -1,9 +1,7 @@
 import type {
   MagicAppsConfig,
   AppInfo,
-  Template,
   ApiResponse,
-  PaginatedResponse,
   ChatCompletionRequest,
   ChatCompletionResponse,
   EmbeddingResponse,
@@ -14,7 +12,7 @@ import type {
   AiUsageOptions,
   Device,
   DeviceCatalogResponse,
-  RegistryApp,
+  AuthTokenResponse,
 } from "./types.js";
 import { ApiError, MagicAppsError } from "./errors.js";
 
@@ -51,57 +49,198 @@ export class MagicAppsClient {
     return this.request<AppInfo>("GET", `/apps/${this.appId}`);
   }
 
-  /** List templates for the current application. */
-  async listTemplates(
-    nextToken?: string,
-  ): Promise<PaginatedResponse<Template>> {
-    const params = new URLSearchParams();
-    if (nextToken) params.set("next_token", nextToken);
-    const query = params.toString();
-    const path = `/apps/${this.appId}/templates${query ? `?${query}` : ""}`;
-    return this.request<PaginatedResponse<Template>>(
-      "GET",
-      path,
-    ) as Promise<PaginatedResponse<Template>>;
-  }
-
   /** Get a specific template by ID. */
-  async getTemplate(templateId: string): Promise<ApiResponse<Template>> {
-    return this.request<Template>(
+  async getTemplate(templateId: string): Promise<ApiResponse<any>> {
+    return this.request(
       "GET",
       `/apps/${this.appId}/templates/${templateId}`,
     );
   }
 
-  /** Create a new template for the current application. Requires auth. */
-  async createTemplate(
-    template: Omit<Template, "template_id" | "app_id" | "created_at" | "updated_at">,
-  ): Promise<ApiResponse<Template>> {
-    return this.request<Template>(
+  // --- Auth ---
+
+  /** Exchange an Apple identity token for MagicApps auth tokens. */
+  async appleExchangeToken(
+    identityToken: string,
+    appId: string,
+  ): Promise<ApiResponse<AuthTokenResponse>> {
+    return this.request<AuthTokenResponse>(
       "POST",
-      `/apps/${this.appId}/templates`,
-      template,
+      "/auth/client/apple/exchange",
+      { identity_token: identityToken, app_id: appId },
     );
   }
 
-  /** Update an existing template. Requires auth. */
-  async updateTemplate(
-    templateId: string,
-    template: Partial<Omit<Template, "template_id" | "app_id" | "created_at" | "updated_at">>,
-  ): Promise<ApiResponse<Template>> {
-    return this.request<Template>(
-      "PUT",
-      `/apps/${this.appId}/templates/${templateId}`,
-      template,
+  /** Exchange a Google ID token for MagicApps auth tokens. */
+  async googleExchangeToken(
+    idToken: string,
+    appId: string,
+    accessToken?: string,
+  ): Promise<ApiResponse<AuthTokenResponse>> {
+    return this.request<AuthTokenResponse>(
+      "POST",
+      "/auth/client/google/exchange",
+      { id_token: idToken, app_id: appId, ...(accessToken ? { access_token: accessToken } : {}) },
     );
   }
 
-  /** Delete a template. Requires auth. */
-  async deleteTemplate(templateId: string): Promise<ApiResponse<void>> {
-    return this.request<void>(
-      "DELETE",
-      `/apps/${this.appId}/templates/${templateId}`,
+  /** Refresh an expired auth token using a refresh token. */
+  async refreshToken(
+    refreshToken: string,
+  ): Promise<ApiResponse<AuthTokenResponse>> {
+    return this.request<AuthTokenResponse>(
+      "POST",
+      "/auth/client/refresh",
+      { refresh_token: refreshToken },
     );
+  }
+
+  /** Link an external provider account to the current user. */
+  async linkProvider(
+    provider: string,
+    token: string,
+  ): Promise<ApiResponse<any>> {
+    return this.request(
+      "POST",
+      "/auth/client/link",
+      { provider, token },
+    );
+  }
+
+  /** Get passkey registration options (WebAuthn). */
+  async getPasskeyRegisterOptions(): Promise<ApiResponse<any>> {
+    return this.request("POST", "/auth/client/passkey/register/options");
+  }
+
+  /** Verify a passkey registration credential (WebAuthn). */
+  async verifyPasskeyRegistration(
+    credential: any,
+  ): Promise<ApiResponse<any>> {
+    return this.request(
+      "POST",
+      "/auth/client/passkey/register/verify",
+      credential,
+    );
+  }
+
+  /** Get passkey authentication options (WebAuthn). */
+  async getPasskeyAuthOptions(): Promise<ApiResponse<any>> {
+    return this.request("POST", "/auth/client/passkey/authenticate/options");
+  }
+
+  /** Verify a passkey authentication assertion (WebAuthn). */
+  async verifyPasskeyAuth(
+    assertion: any,
+  ): Promise<ApiResponse<any>> {
+    return this.request(
+      "POST",
+      "/auth/client/passkey/authenticate/verify",
+      assertion,
+    );
+  }
+
+  /** Request an email magic link for passwordless login. */
+  async requestEmailMagicLink(
+    email: string,
+  ): Promise<ApiResponse<any>> {
+    return this.request(
+      "POST",
+      "/auth/client/email/request",
+      { email },
+    );
+  }
+
+  /** Verify an email magic link token. */
+  async verifyEmailMagicLink(
+    token: string,
+  ): Promise<ApiResponse<any>> {
+    return this.request(
+      "POST",
+      "/auth/client/email/verify",
+      { token },
+    );
+  }
+
+  // --- Owner ---
+
+  /** Register a device owner for the given app. */
+  async registerOwner(
+    deviceOwnerId: string,
+    appId: string,
+    hcaptchaToken?: string,
+  ): Promise<ApiResponse<{ owner_token: string }>> {
+    return this.request(
+      "POST",
+      "/owner/register",
+      { device_owner_id: deviceOwnerId, app_id: appId, ...(hcaptchaToken ? { hcaptcha_token: hcaptchaToken } : {}) },
+    );
+  }
+
+  /** Migrate a device owner to a full user account. */
+  async migrateOwnerToUser(
+    deviceOwnerId: string,
+    appId: string,
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request(
+      "POST",
+      "/owner/migrate",
+      { device_owner_id: deviceOwnerId, app_id: appId },
+    );
+  }
+
+  // --- Settings / Config ---
+
+  /** Get the settings for the current app. */
+  async getSettings(): Promise<ApiResponse<any>> {
+    return this.request("GET", `/apps/${this.appId}/settings`);
+  }
+
+  /** Update the settings for the current app. */
+  async updateSettings(
+    body: Record<string, any>,
+  ): Promise<ApiResponse<any>> {
+    return this.request("PUT", `/apps/${this.appId}/settings`, body);
+  }
+
+  /** Get the config for the current app. */
+  async getConfig(): Promise<ApiResponse<any>> {
+    return this.request("GET", `/apps/${this.appId}/config`);
+  }
+
+  /** Update the config for the current app. */
+  async updateConfig(
+    body: Record<string, any>,
+  ): Promise<ApiResponse<any>> {
+    return this.request("PUT", `/apps/${this.appId}/config`, body);
+  }
+
+  /** Get the secret for a specific integration. */
+  async getIntegrationSecret(
+    integrationId: string,
+  ): Promise<ApiResponse<any>> {
+    return this.request(
+      "GET",
+      `/apps/${this.appId}/integrations/${encodeURIComponent(integrationId)}/secret`,
+    );
+  }
+
+  /** Upload or update the secret for a specific integration. */
+  async uploadIntegrationSecret(
+    integrationId: string,
+    body: Record<string, any>,
+  ): Promise<ApiResponse<any>> {
+    return this.request(
+      "POST",
+      `/apps/${this.appId}/integrations/${encodeURIComponent(integrationId)}/secret`,
+      body,
+    );
+  }
+
+  // --- Catalog ---
+
+  /** Get the catalog for the current app. */
+  async getCatalog(): Promise<ApiResponse<any>> {
+    return this.request("GET", `/apps/${this.appId}/catalog`);
   }
 
   // --- AI Services ---
@@ -189,13 +328,6 @@ export class MagicAppsClient {
     const response = await this.getDevices();
     const catalog = response.data;
     return catalog.devices ?? [];
-  }
-
-  // --- Registry ---
-
-  /** Browse the registry catalog of well-known apps and templates. */
-  async getRegistryApps(): Promise<ApiResponse<RegistryApp[]>> {
-    return this.request<RegistryApp[]>("GET", `/registry/apps`);
   }
 
   // --- Endpoints ---

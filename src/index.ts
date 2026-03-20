@@ -26,6 +26,7 @@ export type {
   Device,
   DeviceCatalogResponse,
   RegistryApp,
+  AuthTokenResponse,
 } from "./types.js";
 export { MagicAppsError, ApiError } from "./errors.js";
 export {

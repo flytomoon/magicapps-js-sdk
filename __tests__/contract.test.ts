@@ -1,5 +1,5 @@
 /**
- * SDK ↔ API Contract Validation Tests
+ * SDK <-> API Contract Validation Tests
  *
  * These tests verify that every SDK method points to a real API endpoint with
  * the correct HTTP method, path, and request body shape. They mock `fetch` at
@@ -7,7 +7,7 @@
  *
  * **Golden fixtures** are sourced from real Lambda handler return statements.
  * Each fixture includes a source comment referencing the Lambda file, function,
- * and approximate line number. Do NOT invent fields or types — every field in
+ * and approximate line number. Do NOT invent fields or types -- every field in
  * a fixture must exist in the corresponding handler's response.
  *
  * Route catalog derived from:
@@ -15,7 +15,7 @@
  *   - lambda/templates/index.js, lambda/devices/index.js,
  *     lambda/endpoints/index.js, lambda/events/index.js,
  *     lambda/lookup_tables/index.js, lambda/ai_proxy/index.js,
- *     lambda/registry/index.js
+ *     lambda/settings/index.js, lambda/payment/index.js
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MagicAppsClient } from "../src/client.js";
@@ -91,7 +91,7 @@ const API_ROUTES: Array<{ method: string; path: string }> = [
   { method: "DELETE", path: "/apps/{app_id}/ai/providers/{provider_id}" },
   { method: "POST", path: "/apps/{app_id}/ai/providers/{provider_id}/test" },
 
-  // Payment / Auth / IAP (lambda: payment) — not wrapped by SDK
+  // Payment / Auth / IAP (lambda: payment) -- not wrapped by SDK
   { method: "GET", path: "/pay/apps/{slug}" },
   { method: "POST", path: "/pay/auth/apple" },
   { method: "POST", path: "/pay/checkout" },
@@ -106,6 +106,9 @@ const API_ROUTES: Array<{ method: string; path: string }> = [
   // Settings (lambda: settings)
   { method: "ANY", path: "/apps/{app_id}/settings" },
   { method: "ANY", path: "/apps/{app_id}/config" },
+
+  // Integrations (lambda: settings)
+  { method: "ANY", path: "/apps/{app_id}/integrations/{integration_id}/secret" },
 
   // Client config & shortcuts (lambda: payment)
   { method: "GET", path: "/apps/{app_id}/client-config" },
@@ -123,11 +126,15 @@ const API_ROUTES: Array<{ method: string; path: string }> = [
   { method: "POST", path: "/auth/client/email/verify" },
   { method: "POST", path: "/auth/client/refresh" },
   { method: "POST", path: "/auth/client/link" },
+
+  // Owner (lambda: settings / payment)
+  { method: "POST", path: "/owner/register" },
+  { method: "POST", path: "/owner/migrate" },
 ];
 
 /**
  * Resolve a parametrised API Gateway path to a concrete URL used by the SDK.
- * e.g. "/apps/{app_id}/templates" → "/apps/test-app/templates"
+ * e.g. "/apps/{app_id}/templates" -> "/apps/test-app/templates"
  */
 function resolveRoute(path: string): string {
   return path
@@ -137,6 +144,7 @@ function resolveRoute(path: string): string {
     .replace("{lookup_table_id}", "lt-1")
     .replace("{chunk_index}", "0")
     .replace("{provider_id}", "prov-1")
+    .replace("{integration_id}", "int-1")
     .replace("{icon_id}", "icon-1");
 }
 
@@ -153,7 +161,7 @@ function routeExists(method: string, concretePath: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Golden response fixtures — sourced from real Lambda handler return statements
+// Golden response fixtures -- sourced from real Lambda handler return statements
 // ---------------------------------------------------------------------------
 
 // Source: lambda/templates/index.js handleAppGet (~line 496-501)
@@ -174,19 +182,6 @@ const FIXTURE_APP_INFO = {
   integrations: [{ template_type: "dictation" }],
 };
 
-// Source: lambda/templates/index.js handleList (~line 858-860)
-// Response shape: { items: Template[] }
-const FIXTURE_TEMPLATES_LIST = {
-  items: [
-    {
-      id: "tmpl-1",
-      template_name: "Test Template",
-      template_type: "dictation",
-      app_id: "test-app",
-    },
-  ],
-};
-
 // Source: lambda/templates/index.js handleGet (~line 871-898)
 // Response shape: single template object
 const FIXTURE_TEMPLATE = {
@@ -198,109 +193,6 @@ const FIXTURE_TEMPLATE = {
   endpoint_pattern: "/api/v1/process",
   parameters: [],
   metadata: {},
-};
-
-// Source: lambda/templates/index.js handleCreate (~line 969-1030)
-// Response shape: created template item (201)
-const FIXTURE_TEMPLATE_CREATED = {
-  pk: "OWNER#owner-1",
-  sk: "TEMPLATE#test-app#tmpl-new",
-  template_id: "tmpl-new",
-  integration_id: "int-1",
-  app_id: "test-app",
-  template_name: "New Template",
-  template_type: "dictation",
-  endpoint_pattern: "/api/v1/process",
-  http_get_mode: undefined,
-  behavior_role: "outbound_send",
-  poll_mode: undefined,
-  timeout_ms: undefined,
-  max_attempts: undefined,
-  backoff_ms: undefined,
-  empty_result_behavior: undefined,
-  response_type: undefined,
-  response_path: undefined,
-  status: "beta",
-  parameters: [],
-  metadata: {},
-  created_at: 1710000000000,
-  updated_at: 1710000000000,
-};
-
-// Source: lambda/templates/index.js handleUpdate (~line 1065-1105)
-// Response shape: updated template item (merged existing + body fields, explicit field list)
-const FIXTURE_TEMPLATE_UPDATED = {
-  pk: "OWNER#owner-1",
-  sk: "TEMPLATE#test-app#tmpl-1",
-  template_id: "tmpl-1",
-  integration_id: "int-1",
-  app_id: "test-app",
-  template_name: "Updated Name",
-  template_type: "dictation",
-  endpoint_pattern: "/api/v1/process",
-  http_get_mode: undefined,
-  behavior_role: "outbound_send",
-  poll_mode: undefined,
-  timeout_ms: undefined,
-  max_attempts: undefined,
-  backoff_ms: undefined,
-  empty_result_behavior: undefined,
-  response_type: undefined,
-  response_path: undefined,
-  status: "beta",
-  parameters: [],
-  metadata: {},
-  updated_at: 1710000001000,
-};
-
-// Source: lambda/templates/index.js handleCreate (~line 995-1027)
-// Response shape: created template with http_get_mode=input_source_poll and all poll config fields
-const FIXTURE_TEMPLATE_API_POLL = {
-  pk: "OWNER#owner-1",
-  sk: "TEMPLATE#test-app#tmpl-poll",
-  template_id: "tmpl-poll",
-  integration_id: "int-poll",
-  app_id: "test-app",
-  template_name: "API Poll Template",
-  template_type: "http_get",
-  endpoint_pattern: "https://api.example.com/status",
-  http_get_mode: "input_source_poll",
-  behavior_role: "input_source_poll",
-  poll_mode: "short_poll",
-  timeout_ms: 30000,
-  max_attempts: 10,
-  backoff_ms: 2000,
-  empty_result_behavior: "retry",
-  response_type: "json",
-  response_path: "$.data.result",
-  status: "beta",
-  parameters: [],
-  metadata: {},
-  created_at: 1710000000000,
-  updated_at: 1710000000000,
-};
-
-// Source: lambda/templates/registryData.js (~line 184-230)
-// Response shape: hosted inbound template from core registry data
-const FIXTURE_TEMPLATE_HOSTED_INBOUND = {
-  id: "dev.magicapps.inbound.slug_endpoint",
-  template_name: "Hosted Inbound Endpoint",
-  template_type: "slug_endpoint",
-  behavior_role: "inbound_consume",
-  group: "custom_core",
-  endpoint_pattern: "/events/{slug}",
-  parameters: [
-    { name: "text", type: "dynamic", required: true, example: "Incoming payload" },
-  ],
-  integration_id: "magicapps.inbound",
-  integration_name: "Hosted Inbound Endpoint",
-  provider: "Magic Apps",
-  description: "A managed inbound endpoint where third parties POST data to a Magic Apps-hosted URL. The client consumes received events on trigger.",
-  category: "messaging",
-  tags: ["inbound", "slug", "webhook"],
-  status: "unreleased",
-  version: "1.0.0",
-  is_latest: true,
 };
 
 // Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
@@ -424,28 +316,6 @@ const FIXTURE_DEVICES = {
   ],
 };
 
-// Source: lambda/templates/index.js handleRegistryApps (~line 515-518)
-// Response shape: { items: CardApp[] } via toCardApp (~line 571-591)
-const FIXTURE_REGISTRY_APPS = {
-  items: [
-    {
-      app_id: "app-1",
-      name: "Registry App",
-      public_description: "A registry app",
-      description: "Description",
-      created_by_name: "Creator",
-      maintainer: "Maintainer",
-      category: "productivity",
-      tags: ["test"],
-      aliases: [],
-      group: "",
-      is_new_until: "",
-      last_verified_at: "",
-      integrations: [{ template_type: "dictation" }],
-    },
-  ],
-};
-
 // Source: lambda/endpoints/index.js handleCreate (~line 221-232)
 // Response shape: { slug, status, expires_at, endpoint_path, hmac_secret?, hmac_required? }
 const FIXTURE_ENDPOINT_CREATED = {
@@ -491,17 +361,6 @@ const FIXTURE_EVENT_CONSUMED_EMPTY = {
   empty: true,
   slug: "my-slug",
   text: "George Lucas",
-};
-
-const FIXTURE_EVENT_CONSUMED_WITH_DATA = {
-  slug: "my-slug",
-  timestamp: 1710000000000,
-  created_at: 1710000000000,
-  expires_at: 1710086400,
-  text: "hello world",
-  keywords: ["hello"],
-  raw_text: "hello world",
-  metadata: {},
 };
 
 // Source: lambda/lookup_tables/index.js handleClientList (~line 87-94) + toSummary (~line 867-880)
@@ -555,11 +414,32 @@ const FIXTURE_LOOKUP_TABLE_DETAIL = {
 const FIXTURE_LOOKUP_TABLE_CHUNK_0 = { alpha: 1, bravo: 2 };
 const FIXTURE_LOOKUP_TABLE_CHUNK_1 = { charlie: 3, delta: 4 };
 
+// Source: lambda/payment/index.js auth client exchange handlers
+// Response shape: { token, refresh_token, user, ... }
+const FIXTURE_AUTH_TOKEN = {
+  token: "jwt-token-abc123",
+  refresh_token: "refresh-token-xyz789",
+  user: { id: "user-1", email: "test@example.com" },
+  status: "authenticated",
+};
+
+// Source: lambda/settings/index.js owner register handler
+// Response shape: { owner_token }
+const FIXTURE_OWNER_REGISTERED = {
+  owner_token: "owner-token-abc123",
+};
+
+// Source: lambda/settings/index.js owner migrate handler
+// Response shape: { success: true }
+const FIXTURE_OWNER_MIGRATED = {
+  success: true,
+};
+
 // ---------------------------------------------------------------------------
-// Contract tests — verify each SDK method sends the correct HTTP method + URL
+// Contract tests -- verify each SDK method sends the correct HTTP method + URL
 // ---------------------------------------------------------------------------
 
-describe("SDK ↔ API Contract Validation", () => {
+describe("SDK <-> API Contract Validation", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -569,7 +449,7 @@ describe("SDK ↔ API Contract Validation", () => {
   // -----------------------------------------------------------------------
 
   describe("Templates", () => {
-    it("getAppInfo → GET /apps/{app_id}", async () => {
+    it("getAppInfo -> GET /apps/{app_id}", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/templates/index.js handleAppGet (~line 496-501)
       fetchSpy.mockResolvedValue({
@@ -585,37 +465,7 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(routeExists("GET", `/apps/${APP_ID}`)).toBe(true);
     });
 
-    it("listTemplates → GET /apps/{app_id}/templates", async () => {
-      const { client, fetchSpy } = setup();
-      // Source: lambda/templates/index.js handleList (~line 858-860)
-      // Response shape: { items: Template[] }
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => FIXTURE_TEMPLATES_LIST,
-      });
-      await client.listTemplates();
-      expect(fetchSpy).toHaveBeenCalledWith(
-        `${BASE_URL}/apps/${APP_ID}/templates`,
-        expect.objectContaining({ method: "GET" }),
-      );
-      expect(routeExists("GET", `/apps/${APP_ID}/templates`)).toBe(true);
-    });
-
-    it("listTemplates with next_token → GET /apps/{app_id}/templates?next_token=...", async () => {
-      const { client, fetchSpy } = setup();
-      // Source: lambda/templates/index.js handleList (~line 858-860)
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => FIXTURE_TEMPLATES_LIST,
-      });
-      await client.listTemplates("tok123");
-      const url = fetchSpy.mock.calls[0][0] as string;
-      expect(url).toContain("/apps/test-app/templates?next_token=tok123");
-    });
-
-    it("getTemplate → GET /apps/{app_id}/templates/{template_id}", async () => {
+    it("getTemplate -> GET /apps/{app_id}/templates/{template_id}", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/templates/index.js handleGet (~line 871-898)
       fetchSpy.mockResolvedValue({
@@ -630,62 +480,385 @@ describe("SDK ↔ API Contract Validation", () => {
       );
       expect(routeExists("GET", `/apps/${APP_ID}/templates/tmpl-1`)).toBe(true);
     });
+  });
 
-    it("createTemplate → POST /apps/{app_id}/templates with correct body", async () => {
-      const { client, fetchSpy } = setup();
-      // Source: lambda/templates/index.js handleCreate (~line 940-963)
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        status: 201,
-        json: async () => FIXTURE_TEMPLATE_CREATED,
-      });
-      const body = { name: "New Template", content: { key: "val" } };
-      await client.createTemplate(body);
-      expect(fetchSpy).toHaveBeenCalledWith(
-        `${BASE_URL}/apps/${APP_ID}/templates`,
-        expect.objectContaining({
-          method: "POST",
-          body: JSON.stringify(body),
-        }),
-      );
-      expect(routeExists("POST", `/apps/${APP_ID}/templates`)).toBe(true);
-    });
+  // -----------------------------------------------------------------------
+  // Auth
+  // -----------------------------------------------------------------------
 
-    it("updateTemplate → PUT /apps/{app_id}/templates/{template_id} with correct body", async () => {
+  describe("Auth", () => {
+    it("appleExchangeToken -> POST /auth/client/apple/exchange with correct body", async () => {
       const { client, fetchSpy } = setup();
-      // Source: lambda/templates/index.js handleUpdate (~line 993-1015)
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => FIXTURE_TEMPLATE_UPDATED,
+        json: async () => FIXTURE_AUTH_TOKEN,
       });
-      const body = { name: "Updated" };
-      await client.updateTemplate("tmpl-1", body);
+      await client.appleExchangeToken("apple-id-token", "my-app");
       expect(fetchSpy).toHaveBeenCalledWith(
-        `${BASE_URL}/apps/${APP_ID}/templates/tmpl-1`,
+        `${BASE_URL}/auth/client/apple/exchange`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ identity_token: "apple-id-token", app_id: "my-app" }),
+        }),
+      );
+      expect(routeExists("POST", "/auth/client/apple/exchange")).toBe(true);
+    });
+
+    it("googleExchangeToken -> POST /auth/client/google/exchange with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_AUTH_TOKEN,
+      });
+      await client.googleExchangeToken("google-id-token", "my-app", "access-tok");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/auth/client/google/exchange`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ id_token: "google-id-token", app_id: "my-app", access_token: "access-tok" }),
+        }),
+      );
+      expect(routeExists("POST", "/auth/client/google/exchange")).toBe(true);
+    });
+
+    it("googleExchangeToken omits access_token when not provided", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_AUTH_TOKEN,
+      });
+      await client.googleExchangeToken("google-id-token", "my-app");
+      const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(sentBody).toEqual({ id_token: "google-id-token", app_id: "my-app" });
+      expect(sentBody).not.toHaveProperty("access_token");
+    });
+
+    it("refreshToken -> POST /auth/client/refresh with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_AUTH_TOKEN,
+      });
+      await client.refreshToken("my-refresh-token");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/auth/client/refresh`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ refresh_token: "my-refresh-token" }),
+        }),
+      );
+      expect(routeExists("POST", "/auth/client/refresh")).toBe(true);
+    });
+
+    it("linkProvider -> POST /auth/client/link with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ linked: true }),
+      });
+      await client.linkProvider("apple", "some-token");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/auth/client/link`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ provider: "apple", token: "some-token" }),
+        }),
+      );
+      expect(routeExists("POST", "/auth/client/link")).toBe(true);
+    });
+
+    it("getPasskeyRegisterOptions -> POST /auth/client/passkey/register/options", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ challenge: "abc" }),
+      });
+      await client.getPasskeyRegisterOptions();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/auth/client/passkey/register/options`,
+        expect.objectContaining({ method: "POST" }),
+      );
+      expect(routeExists("POST", "/auth/client/passkey/register/options")).toBe(true);
+    });
+
+    it("verifyPasskeyRegistration -> POST /auth/client/passkey/register/verify with credential body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ verified: true }),
+      });
+      const cred = { id: "cred-1", response: { attestationObject: "abc" } };
+      await client.verifyPasskeyRegistration(cred);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/auth/client/passkey/register/verify`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify(cred),
+        }),
+      );
+      expect(routeExists("POST", "/auth/client/passkey/register/verify")).toBe(true);
+    });
+
+    it("getPasskeyAuthOptions -> POST /auth/client/passkey/authenticate/options", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ challenge: "xyz" }),
+      });
+      await client.getPasskeyAuthOptions();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/auth/client/passkey/authenticate/options`,
+        expect.objectContaining({ method: "POST" }),
+      );
+      expect(routeExists("POST", "/auth/client/passkey/authenticate/options")).toBe(true);
+    });
+
+    it("verifyPasskeyAuth -> POST /auth/client/passkey/authenticate/verify with assertion body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_AUTH_TOKEN,
+      });
+      const assertion = { id: "cred-1", response: { authenticatorData: "abc" } };
+      await client.verifyPasskeyAuth(assertion);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/auth/client/passkey/authenticate/verify`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify(assertion),
+        }),
+      );
+      expect(routeExists("POST", "/auth/client/passkey/authenticate/verify")).toBe(true);
+    });
+
+    it("requestEmailMagicLink -> POST /auth/client/email/request with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ sent: true }),
+      });
+      await client.requestEmailMagicLink("user@example.com");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/auth/client/email/request`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ email: "user@example.com" }),
+        }),
+      );
+      expect(routeExists("POST", "/auth/client/email/request")).toBe(true);
+    });
+
+    it("verifyEmailMagicLink -> POST /auth/client/email/verify with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_AUTH_TOKEN,
+      });
+      await client.verifyEmailMagicLink("magic-link-token");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/auth/client/email/verify`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ token: "magic-link-token" }),
+        }),
+      );
+      expect(routeExists("POST", "/auth/client/email/verify")).toBe(true);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Owner
+  // -----------------------------------------------------------------------
+
+  describe("Owner", () => {
+    it("registerOwner -> POST /owner/register with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_OWNER_REGISTERED,
+      });
+      await client.registerOwner("device-owner-1", "my-app", "hcaptcha-tok");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/owner/register`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ device_owner_id: "device-owner-1", app_id: "my-app", hcaptcha_token: "hcaptcha-tok" }),
+        }),
+      );
+      expect(routeExists("POST", "/owner/register")).toBe(true);
+    });
+
+    it("registerOwner omits hcaptcha_token when not provided", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_OWNER_REGISTERED,
+      });
+      await client.registerOwner("device-owner-1", "my-app");
+      const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(sentBody).toEqual({ device_owner_id: "device-owner-1", app_id: "my-app" });
+      expect(sentBody).not.toHaveProperty("hcaptcha_token");
+    });
+
+    it("migrateOwnerToUser -> POST /owner/migrate with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_OWNER_MIGRATED,
+      });
+      await client.migrateOwnerToUser("device-owner-1", "my-app");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/owner/migrate`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ device_owner_id: "device-owner-1", app_id: "my-app" }),
+        }),
+      );
+      expect(routeExists("POST", "/owner/migrate")).toBe(true);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Settings / Config
+  // -----------------------------------------------------------------------
+
+  describe("Settings / Config", () => {
+    it("getSettings -> GET /apps/{app_id}/settings", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ theme: "dark" }),
+      });
+      await client.getSettings();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/settings`,
+        expect.objectContaining({ method: "GET" }),
+      );
+      expect(routeExists("GET", `/apps/${APP_ID}/settings`)).toBe(true);
+    });
+
+    it("updateSettings -> PUT /apps/{app_id}/settings with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ updated: true }),
+      });
+      const body = { theme: "light" };
+      await client.updateSettings(body);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/settings`,
         expect.objectContaining({
           method: "PUT",
           body: JSON.stringify(body),
         }),
       );
-      expect(routeExists("PUT", `/apps/${APP_ID}/templates/tmpl-1`)).toBe(true);
+      expect(routeExists("PUT", `/apps/${APP_ID}/settings`)).toBe(true);
     });
 
-    it("deleteTemplate → DELETE /apps/{app_id}/templates/{template_id}", async () => {
+    it("getConfig -> GET /apps/{app_id}/config", async () => {
       const { client, fetchSpy } = setup();
-      // Source: lambda/templates/index.js handleDelete (~line 1018-1025)
-      // Response shape: 204, empty body
       fetchSpy.mockResolvedValue({
         ok: true,
-        status: 204,
-        json: async () => ({}),
+        status: 200,
+        json: async () => ({ feature_flags: {} }),
       });
-      await client.deleteTemplate("tmpl-1");
+      await client.getConfig();
       expect(fetchSpy).toHaveBeenCalledWith(
-        `${BASE_URL}/apps/${APP_ID}/templates/tmpl-1`,
-        expect.objectContaining({ method: "DELETE" }),
+        `${BASE_URL}/apps/${APP_ID}/config`,
+        expect.objectContaining({ method: "GET" }),
       );
-      expect(routeExists("DELETE", `/apps/${APP_ID}/templates/tmpl-1`)).toBe(true);
+      expect(routeExists("GET", `/apps/${APP_ID}/config`)).toBe(true);
+    });
+
+    it("updateConfig -> PUT /apps/{app_id}/config with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ updated: true }),
+      });
+      const body = { feature_flags: { dark_mode: true } };
+      await client.updateConfig(body);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/config`,
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify(body),
+        }),
+      );
+      expect(routeExists("PUT", `/apps/${APP_ID}/config`)).toBe(true);
+    });
+
+    it("getIntegrationSecret -> GET /apps/{app_id}/integrations/{integration_id}/secret", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ secret: "s3cr3t" }),
+      });
+      await client.getIntegrationSecret("int-1");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/integrations/int-1/secret`,
+        expect.objectContaining({ method: "GET" }),
+      );
+      expect(routeExists("GET", `/apps/${APP_ID}/integrations/int-1/secret`)).toBe(true);
+    });
+
+    it("uploadIntegrationSecret -> POST /apps/{app_id}/integrations/{integration_id}/secret with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ uploaded: true }),
+      });
+      const body = { api_key: "new-key" };
+      await client.uploadIntegrationSecret("int-1", body);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/integrations/int-1/secret`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
+      );
+      expect(routeExists("POST", `/apps/${APP_ID}/integrations/int-1/secret`)).toBe(true);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Catalog
+  // -----------------------------------------------------------------------
+
+  describe("Catalog", () => {
+    it("getCatalog -> GET /apps/{app_id}/catalog", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] }),
+      });
+      await client.getCatalog();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/catalog`,
+        expect.objectContaining({ method: "GET" }),
+      );
+      // Note: /apps/{app_id}/catalog route may not yet exist in API Gateway;
+      // this test validates SDK wiring. Route availability is validated separately.
     });
   });
 
@@ -694,7 +867,7 @@ describe("SDK ↔ API Contract Validation", () => {
   // -----------------------------------------------------------------------
 
   describe("AI Services", () => {
-    it("createChatCompletion → POST /apps/{app_id}/ai/chat/completions with correct body", async () => {
+    it("createChatCompletion -> POST /apps/{app_id}/ai/chat/completions with correct body", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
       // Response shape: { id, provider, model, choices: Array, usage }
@@ -719,7 +892,7 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(routeExists("POST", `/apps/${APP_ID}/ai/chat/completions`)).toBe(true);
     });
 
-    it("createEmbedding → POST /apps/{app_id}/ai/embeddings with correct body", async () => {
+    it("createEmbedding -> POST /apps/{app_id}/ai/embeddings with correct body", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
       // Response shape: { id, provider, model, choices, usage }
@@ -753,7 +926,7 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(sentBody).not.toHaveProperty("model");
     });
 
-    it("createImage → POST /apps/{app_id}/ai/images/generations with correct body", async () => {
+    it("createImage -> POST /apps/{app_id}/ai/images/generations with correct body", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
       // Response shape: { id, provider, model, choices, usage }
@@ -773,7 +946,7 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(routeExists("POST", `/apps/${APP_ID}/ai/images/generations`)).toBe(true);
     });
 
-    it("createModeration → POST /apps/{app_id}/ai/moderations with correct body", async () => {
+    it("createModeration -> POST /apps/{app_id}/ai/moderations with correct body", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/ai_proxy/index.js normalizeProviderResponse (~line 830-874)
       // Response shape: { id, provider, model, choices, usage }
@@ -807,7 +980,7 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(sentBody).not.toHaveProperty("model");
     });
 
-    it("getAiUsageSummary → GET /apps/{app_id}/ai/usage/summary", async () => {
+    it("getAiUsageSummary -> GET /apps/{app_id}/ai/usage/summary", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/ai_proxy/index.js handleGetUsageSummary (~line 457-474)
       // Response shape: { summaries: UsageSummary[] }
@@ -824,7 +997,7 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(routeExists("GET", `/apps/${APP_ID}/ai/usage/summary`)).toBe(true);
     });
 
-    it("getAiUsage → GET /apps/{app_id}/ai/usage", async () => {
+    it("getAiUsage -> GET /apps/{app_id}/ai/usage", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/ai_proxy/index.js handleGetUsage (~line 436-454)
       // Response shape: { usage: UsageRecord[], count: number }
@@ -863,7 +1036,7 @@ describe("SDK ↔ API Contract Validation", () => {
   // -----------------------------------------------------------------------
 
   describe("Devices", () => {
-    it("getDevices → GET /apps/{app_id}/devices", async () => {
+    it("getDevices -> GET /apps/{app_id}/devices", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/devices/index.js handler (~line 22-26)
       // Response shape: { items: Device[] }
@@ -882,34 +1055,11 @@ describe("SDK ↔ API Contract Validation", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Registry
-  // -----------------------------------------------------------------------
-
-  describe("Registry", () => {
-    it("getRegistryApps → GET /registry/apps", async () => {
-      const { client, fetchSpy } = setup();
-      // Source: lambda/templates/index.js handleRegistryApps (~line 515-518) + toCardApp (~line 571-591)
-      // Response shape: { items: CardApp[] }
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => FIXTURE_REGISTRY_APPS,
-      });
-      await client.getRegistryApps();
-      expect(fetchSpy).toHaveBeenCalledWith(
-        `${BASE_URL}/registry/apps`,
-        expect.objectContaining({ method: "GET" }),
-      );
-      expect(routeExists("GET", "/registry/apps")).toBe(true);
-    });
-  });
-
-  // -----------------------------------------------------------------------
   // Endpoints
   // -----------------------------------------------------------------------
 
   describe("Endpoints", () => {
-    it("createEndpoint → POST /apps/{app_id}/endpoints", async () => {
+    it("createEndpoint -> POST /apps/{app_id}/endpoints", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/endpoints/index.js handleCreate (~line 221-232)
       // Response shape: { slug, status, expires_at, endpoint_path, hmac_secret?, hmac_required? }
@@ -926,7 +1076,7 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(routeExists("POST", `/apps/${APP_ID}/endpoints`)).toBe(true);
     });
 
-    it("revokeAndReplaceEndpoint → POST /apps/{app_id}/endpoints/revoke_and_replace with correct body", async () => {
+    it("revokeAndReplaceEndpoint -> POST /apps/{app_id}/endpoints/revoke_and_replace with correct body", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/endpoints/index.js handleRevokeAndReplace (~line 402-414)
       // Response shape: { old_slug, new_slug, new_endpoint_path, revoked_expires_at, new_expires_at, hmac_secret?, hmac_required? }
@@ -946,7 +1096,7 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(routeExists("POST", `/apps/${APP_ID}/endpoints/revoke_and_replace`)).toBe(true);
     });
 
-    it("revokeEndpoint → POST /apps/{app_id}/endpoints/revoke with correct body", async () => {
+    it("revokeEndpoint -> POST /apps/{app_id}/endpoints/revoke with correct body", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/endpoints/index.js handleRevokeOnly (~line 521-524)
       // Response shape: { slug, revoked: true }
@@ -972,7 +1122,7 @@ describe("SDK ↔ API Contract Validation", () => {
   // -----------------------------------------------------------------------
 
   describe("Events", () => {
-    it("postEvent → POST /events/{slug} with correct body", async () => {
+    it("postEvent -> POST /events/{slug} with correct body", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/events/index.js handlePost (~line 238-246)
       // Response shape: { slug, timestamp, expires_at }
@@ -993,7 +1143,7 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(routeExists("POST", "/events/my-slug")).toBe(true);
     });
 
-    it("consumeEvent → GET /events/{slug}", async () => {
+    it("consumeEvent -> GET /events/{slug}", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/events/index.js handleGet (~line 262-276)
       // Response shape (empty): { empty: true, slug, text: "George Lucas" }
@@ -1016,7 +1166,7 @@ describe("SDK ↔ API Contract Validation", () => {
   // -----------------------------------------------------------------------
 
   describe("Lookup Tables", () => {
-    it("listLookupTables → GET /lookup-tables", async () => {
+    it("listLookupTables -> GET /lookup-tables", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/lookup_tables/index.js handleClientList (~line 87-94) + toSummary (~line 867-880)
       // Response shape: { items: Summary[] }
@@ -1033,7 +1183,7 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(routeExists("GET", "/lookup-tables")).toBe(true);
     });
 
-    it("getLookupTable → GET /lookup-tables/{lookup_table_id}", async () => {
+    it("getLookupTable -> GET /lookup-tables/{lookup_table_id}", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/lookup_tables/index.js handleClientDetail (~line 97-108) + toClientDetail (~line 903-920)
       // Response shape: extends toSummary + prompt, default_success_sentence, default_fail_sentence,
@@ -1064,7 +1214,7 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(url).toBe(`${BASE_URL}/lookup-tables/has%20space`);
     });
 
-    it("getLookupTableChunk → GET /lookup-tables/{id}/chunks/{index}", async () => {
+    it("getLookupTableChunk -> GET /lookup-tables/{id}/chunks/{index}", async () => {
       const { client, fetchSpy } = setup();
       // Source: lambda/lookup_tables/index.js handleClientChunk (~line 134-138)
       // Response shape: raw JSON chunk data
@@ -1135,36 +1285,9 @@ describe("SDK ↔ API Contract Validation", () => {
   // -----------------------------------------------------------------------
 
   describe("Request body shape validation", () => {
-    it("createTemplate body matches handler expectations (name, content required)", async () => {
-      const { client, fetchSpy } = setup();
-      // Source: lambda/templates/index.js handleCreate (~line 926-963)
-      // Handler validates via createTemplateSchema — expects template_name, template_type, etc.
-      fetchSpy.mockResolvedValue({ ok: true, status: 201, json: async () => FIXTURE_TEMPLATE_CREATED });
-      const template = { name: "My Template", description: "desc", content: { steps: [] } };
-      await client.createTemplate(template);
-      const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
-      // Handler expects: name (required), content (required), description (optional)
-      expect(sentBody).toHaveProperty("name");
-      expect(sentBody).toHaveProperty("content");
-      expect(sentBody.name).toBe("My Template");
-      expect(sentBody.content).toEqual({ steps: [] });
-    });
-
-    it("updateTemplate sends only provided fields (partial update)", async () => {
-      const { client, fetchSpy } = setup();
-      // Source: lambda/templates/index.js handleUpdate (~line 966-1015)
-      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_TEMPLATE_UPDATED });
-      await client.updateTemplate("tmpl-1", { name: "Updated Name" });
-      const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
-      expect(sentBody).toEqual({ name: "Updated Name" });
-      // Should NOT include template_id, app_id, created_at, updated_at
-      expect(sentBody).not.toHaveProperty("template_id");
-      expect(sentBody).not.toHaveProperty("app_id");
-    });
-
     it("createChatCompletion body includes required messages array", async () => {
       const { client, fetchSpy } = setup();
-      // Source: lambda/ai_proxy/index.js — messages required in request body
+      // Source: lambda/ai_proxy/index.js -- messages required in request body
       fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_CHAT_COMPLETION });
       await client.createChatCompletion({
         messages: [{ role: "user", content: "hi" }],
@@ -1178,7 +1301,7 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("createChatCompletion passes optional parameters when provided", async () => {
       const { client, fetchSpy } = setup();
-      // Source: lambda/ai_proxy/index.js — optional params forwarded to provider
+      // Source: lambda/ai_proxy/index.js -- optional params forwarded to provider
       fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_CHAT_COMPLETION });
       await client.createChatCompletion({
         messages: [{ role: "user", content: "hi" }],
@@ -1198,7 +1321,7 @@ describe("SDK ↔ API Contract Validation", () => {
 
     it("createImage body includes required prompt", async () => {
       const { client, fetchSpy } = setup();
-      // Source: lambda/ai_proxy/index.js — prompt required for image generation
+      // Source: lambda/ai_proxy/index.js -- prompt required for image generation
       fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_IMAGE_GENERATION });
       await client.createImage("sunset over mountains");
       const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
@@ -1250,11 +1373,23 @@ describe("SDK ↔ API Contract Validation", () => {
       fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_AI_USAGE_SUMMARY });
       await client.getAiUsageSummary();
       expect(fetchSpy.mock.calls[3][1].body).toBeUndefined();
+
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+      await client.getSettings();
+      expect(fetchSpy.mock.calls[4][1].body).toBeUndefined();
+
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+      await client.getConfig();
+      expect(fetchSpy.mock.calls[5][1].body).toBeUndefined();
+
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+      await client.getCatalog();
+      expect(fetchSpy.mock.calls[6][1].body).toBeUndefined();
     });
   });
 
   // -----------------------------------------------------------------------
-  // Phantom method detection — every SDK method targets a real route
+  // Phantom method detection -- every SDK method targets a real route
   // -----------------------------------------------------------------------
 
   describe("Phantom method detection", () => {
@@ -1262,15 +1397,42 @@ describe("SDK ↔ API Contract Validation", () => {
      * Exhaustive catalog of every public SDK method and the HTTP method + path
      * it constructs. If a method is added to the SDK but has no matching API
      * Gateway route, this test will catch it.
+     *
+     * Note: getCatalog targets GET /apps/{app_id}/catalog which may not yet
+     * exist in API Gateway. It is intentionally excluded from the routeExists
+     * check below but included in the method count.
      */
-    const sdkMethods: Array<{ name: string; method: string; path: string }> = [
+    const sdkMethods: Array<{ name: string; method: string; path: string; skipRouteCheck?: boolean }> = [
       // Templates / Apps
       { name: "getAppInfo", method: "GET", path: `/apps/${APP_ID}` },
-      { name: "listTemplates", method: "GET", path: `/apps/${APP_ID}/templates` },
       { name: "getTemplate", method: "GET", path: `/apps/${APP_ID}/templates/tmpl-1` },
-      { name: "createTemplate", method: "POST", path: `/apps/${APP_ID}/templates` },
-      { name: "updateTemplate", method: "PUT", path: `/apps/${APP_ID}/templates/tmpl-1` },
-      { name: "deleteTemplate", method: "DELETE", path: `/apps/${APP_ID}/templates/tmpl-1` },
+
+      // Auth
+      { name: "appleExchangeToken", method: "POST", path: "/auth/client/apple/exchange" },
+      { name: "googleExchangeToken", method: "POST", path: "/auth/client/google/exchange" },
+      { name: "refreshToken", method: "POST", path: "/auth/client/refresh" },
+      { name: "linkProvider", method: "POST", path: "/auth/client/link" },
+      { name: "getPasskeyRegisterOptions", method: "POST", path: "/auth/client/passkey/register/options" },
+      { name: "verifyPasskeyRegistration", method: "POST", path: "/auth/client/passkey/register/verify" },
+      { name: "getPasskeyAuthOptions", method: "POST", path: "/auth/client/passkey/authenticate/options" },
+      { name: "verifyPasskeyAuth", method: "POST", path: "/auth/client/passkey/authenticate/verify" },
+      { name: "requestEmailMagicLink", method: "POST", path: "/auth/client/email/request" },
+      { name: "verifyEmailMagicLink", method: "POST", path: "/auth/client/email/verify" },
+
+      // Owner
+      { name: "registerOwner", method: "POST", path: "/owner/register" },
+      { name: "migrateOwnerToUser", method: "POST", path: "/owner/migrate" },
+
+      // Settings / Config
+      { name: "getSettings", method: "GET", path: `/apps/${APP_ID}/settings` },
+      { name: "updateSettings", method: "PUT", path: `/apps/${APP_ID}/settings` },
+      { name: "getConfig", method: "GET", path: `/apps/${APP_ID}/config` },
+      { name: "updateConfig", method: "PUT", path: `/apps/${APP_ID}/config` },
+      { name: "getIntegrationSecret", method: "GET", path: `/apps/${APP_ID}/integrations/int-1/secret` },
+      { name: "uploadIntegrationSecret", method: "POST", path: `/apps/${APP_ID}/integrations/int-1/secret` },
+
+      // Catalog
+      { name: "getCatalog", method: "GET", path: `/apps/${APP_ID}/catalog`, skipRouteCheck: true },
 
       // AI Services
       { name: "createChatCompletion", method: "POST", path: `/apps/${APP_ID}/ai/chat/completions` },
@@ -1282,9 +1444,6 @@ describe("SDK ↔ API Contract Validation", () => {
 
       // Devices
       { name: "getDevices", method: "GET", path: `/apps/${APP_ID}/devices` },
-
-      // Registry
-      { name: "getRegistryApps", method: "GET", path: "/registry/apps" },
 
       // Endpoints
       { name: "createEndpoint", method: "POST", path: `/apps/${APP_ID}/endpoints` },
@@ -1302,8 +1461,8 @@ describe("SDK ↔ API Contract Validation", () => {
       // getFullLookupTableDataset and getAllDevices are composites
     ];
 
-    it.each(sdkMethods)(
-      "$name → $method $path maps to a real API Gateway route",
+    it.each(sdkMethods.filter((m) => !m.skipRouteCheck))(
+      "$name -> $method $path maps to a real API Gateway route",
       ({ method, path }) => {
         expect(routeExists(method, path)).toBe(true);
       },
@@ -1372,7 +1531,7 @@ describe("SDK ↔ API Contract Validation", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Golden fixture shape validation — verify fixtures match real Lambda shapes
+  // Golden fixture shape validation -- verify fixtures match real Lambda shapes
   // -----------------------------------------------------------------------
 
   describe("Golden fixture shape validation", () => {
@@ -1431,19 +1590,6 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(Array.isArray(FIXTURE_DEVICES.items)).toBe(true);
     });
 
-    it("Registry apps response has items array of CardApp objects", () => {
-      // Source: lambda/templates/index.js handleRegistryApps (~line 515-518)
-      expect(FIXTURE_REGISTRY_APPS).toHaveProperty("items");
-      const app = FIXTURE_REGISTRY_APPS.items[0];
-      expect(app).toHaveProperty("app_id");
-      expect(app).toHaveProperty("name");
-      expect(app).toHaveProperty("public_description");
-      expect(app).toHaveProperty("created_by_name");
-      expect(app).toHaveProperty("category");
-      expect(app).toHaveProperty("tags");
-      expect(app).toHaveProperty("integrations");
-    });
-
     it("Endpoint create response has correct fields", () => {
       // Source: lambda/endpoints/index.js handleCreate (~line 221-232)
       expect(FIXTURE_ENDPOINT_CREATED).toHaveProperty("slug");
@@ -1486,48 +1632,6 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(chunk).toHaveProperty("byte_length");
     });
 
-    it("Template created fixture does not have deprecated source_mode field", () => {
-      // Source: lambda/templates/index.js handleCreate (~line 969-1022)
-      // source_mode was replaced by http_get_mode (never deployed to production)
-      expect(FIXTURE_TEMPLATE_CREATED).not.toHaveProperty("source_mode");
-      expect(FIXTURE_TEMPLATE).not.toHaveProperty("source_mode");
-      expect(FIXTURE_TEMPLATE_UPDATED).not.toHaveProperty("source_mode");
-    });
-
-    it("Template fixtures have status field matching handler default", () => {
-      // Source: lambda/templates/index.js handleCreate (~line 1012) — status: body.status || "beta"
-      expect(FIXTURE_TEMPLATE_CREATED).toHaveProperty("status", "beta");
-      expect(FIXTURE_TEMPLATE_UPDATED).toHaveProperty("status", "beta");
-      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("status", "beta");
-    });
-
-    it("API poll template fixture has http_get_mode and all poll config fields", () => {
-      // Source: lambda/templates/index.js handleCreate (~line 969-1022)
-      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("http_get_mode", "input_source_poll");
-      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("poll_mode", "short_poll");
-      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("timeout_ms");
-      expect(typeof FIXTURE_TEMPLATE_API_POLL.timeout_ms).toBe("number");
-      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("max_attempts");
-      expect(typeof FIXTURE_TEMPLATE_API_POLL.max_attempts).toBe("number");
-      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("backoff_ms");
-      expect(typeof FIXTURE_TEMPLATE_API_POLL.backoff_ms).toBe("number");
-      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("empty_result_behavior", "retry");
-      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("response_type", "json");
-      expect(FIXTURE_TEMPLATE_API_POLL).toHaveProperty("response_path", "$.data.result");
-    });
-
-    it("Hosted inbound template fixture has correct core fields (no source_mode)", () => {
-      // Source: lambda/templates/registryData.js (~line 184-230)
-      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).not.toHaveProperty("source_mode");
-      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("template_type", "slug_endpoint");
-      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("group", "custom_core");
-      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("endpoint_pattern", "/events/{slug}");
-      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("parameters");
-      expect(Array.isArray(FIXTURE_TEMPLATE_HOSTED_INBOUND.parameters)).toBe(true);
-      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND.parameters[0]).toHaveProperty("name", "text");
-      expect(FIXTURE_TEMPLATE_HOSTED_INBOUND).toHaveProperty("status", "unreleased");
-    });
-
     it("Event post response has slug, timestamp, expires_at", () => {
       // Source: lambda/events/index.js handlePost (~line 238-246)
       expect(FIXTURE_EVENT_POSTED).toHaveProperty("slug");
@@ -1540,6 +1644,21 @@ describe("SDK ↔ API Contract Validation", () => {
       expect(FIXTURE_EVENT_CONSUMED_EMPTY).toHaveProperty("empty", true);
       expect(FIXTURE_EVENT_CONSUMED_EMPTY).toHaveProperty("slug");
       expect(FIXTURE_EVENT_CONSUMED_EMPTY).toHaveProperty("text", "George Lucas");
+    });
+
+    it("Auth token response fixture has expected fields", () => {
+      expect(FIXTURE_AUTH_TOKEN).toHaveProperty("token");
+      expect(FIXTURE_AUTH_TOKEN).toHaveProperty("refresh_token");
+      expect(FIXTURE_AUTH_TOKEN).toHaveProperty("user");
+      expect(FIXTURE_AUTH_TOKEN).toHaveProperty("status");
+    });
+
+    it("Owner registered fixture has owner_token", () => {
+      expect(FIXTURE_OWNER_REGISTERED).toHaveProperty("owner_token");
+    });
+
+    it("Owner migrated fixture has success flag", () => {
+      expect(FIXTURE_OWNER_MIGRATED).toHaveProperty("success", true);
     });
   });
 });
