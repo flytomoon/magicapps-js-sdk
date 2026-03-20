@@ -11,9 +11,9 @@ npm install @magic-apps-cloud/sdk
 ## Quick Start
 
 ```typescript
-import { MagicAppsCloudClient } from "@magic-apps-cloud/sdk";
+import { MagicAppsClient } from "@magic-apps-cloud/sdk";
 
-const client = new MagicAppsCloudClient({
+const client = new MagicAppsClient({
   baseUrl: "https://api.yourplatform.com",
   appId: "your-app-id",
 });
@@ -31,7 +31,7 @@ const { data: templates } = await client.listTemplates();
 Pass an auth token for authenticated endpoints:
 
 ```typescript
-const client = new MagicAppsCloudClient({
+const client = new MagicAppsClient({
   baseUrl: "https://api.yourplatform.com",
   appId: "your-app-id",
   authToken: "your-jwt-token",
@@ -53,14 +53,14 @@ client.setAuthToken("new-token");
 ## Error Handling
 
 ```typescript
-import { MagicAppsCloudClient, ApiError, MagicAppsCloudError } from "@magic-apps-cloud/sdk";
+import { MagicAppsClient, ApiError, MagicAppsError } from "@magic-apps-cloud/sdk";
 
 try {
   await client.getAppInfo();
 } catch (error) {
   if (error instanceof ApiError) {
     console.error(`API error ${error.statusCode}: ${error.message}`);
-  } else if (error instanceof MagicAppsCloudError) {
+  } else if (error instanceof MagicAppsError) {
     console.error(`SDK error: ${error.message}`);
   }
 }
