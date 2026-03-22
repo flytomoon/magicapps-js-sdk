@@ -163,58 +163,6 @@ export interface ModerationResponse {
   results: ModerationResult[];
 }
 
-/** Breakdown of AI usage by model/endpoint. */
-export interface AiUsageBreakdown {
-  endpoint?: string;
-  model?: string;
-  requests?: number;
-  tokens?: number;
-  cost?: number;
-}
-
-/** AI usage summary response. */
-export interface AiUsageSummary {
-  total_requests?: number;
-  total_tokens?: number;
-  total_cost?: number;
-  period?: string;
-  breakdown?: AiUsageBreakdown[];
-}
-
-/** A single AI usage record (per-request detail). */
-export interface AiUsageRecord {
-  usage_id: string;
-  app_id: string;
-  provider_id: string;
-  model_id: string;
-  request_type: string;
-  input_tokens: number;
-  output_tokens: number;
-  total_tokens: number;
-  latency_ms: number;
-  status: string;
-  created_at: number;
-  expires_at: number;
-  error_code?: string;
-  user_id?: string;
-}
-
-/** Response from the detailed AI usage endpoint. */
-export interface AiUsageResponse {
-  usage: AiUsageRecord[];
-  count: number;
-}
-
-/** Options for filtering AI usage records. */
-export interface AiUsageOptions {
-  /** Maximum number of records to return (1-100, default 50). */
-  limit?: number;
-  /** Start of date range (ISO 8601 string). */
-  start_date?: string;
-  /** End of date range (ISO 8601 string). */
-  end_date?: string;
-}
-
 // --- Device Types ---
 
 /** A device in the device catalog. */
