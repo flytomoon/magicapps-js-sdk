@@ -4,12 +4,10 @@ import type {
   ApiResponse,
   ChatCompletionRequest,
   ChatCompletionResponse,
+  ChatMessage,
   EmbeddingResponse,
   ImageGenerationResponse,
   ModerationResponse,
-  AiUsageSummary,
-  AiUsageResponse,
-  AiUsageOptions,
   Device,
   DeviceCatalogResponse,
   AuthTokenResponse,
@@ -42,6 +40,16 @@ export class MagicAppsClient {
   /** Update the auth token (e.g. after login or token refresh). */
   setAuthToken(token: string): void {
     this.authToken = token;
+  }
+
+  /** Clear the auth token (e.g. on logout). */
+  clearAuthToken(): void {
+    this.authToken = undefined;
+  }
+
+  /** Health check - verifies connectivity to the MagicApps API. */
+  async ping(): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>("GET", "/ping");
   }
 
   /** Get information about the current application. */
@@ -292,25 +300,38 @@ export class MagicAppsClient {
     );
   }
 
-  /** Get detailed per-request AI usage records for the current app. */
-  async getAiUsage(
-    options?: AiUsageOptions,
-  ): Promise<ApiResponse<AiUsageResponse>> {
-    const params = new URLSearchParams();
-    if (options?.limit !== undefined) params.set("limit", String(options.limit));
-    if (options?.start_date) params.set("start_date", options.start_date);
-    if (options?.end_date) params.set("end_date", options.end_date);
-    const query = params.toString();
-    const path = `/apps/${this.appId}/ai/usage${query ? `?${query}` : ""}`;
-    return this.request<AiUsageResponse>("GET", path);
+  // --- AI Convenience Methods ---
+
+  /** Convenience: create a chat completion from a messages array. */
+  async chat(
+    messages: ChatMessage[],
+    options?: Partial<Omit<ChatCompletionRequest, "messages">>,
+  ): Promise<ApiResponse<ChatCompletionResponse>> {
+    return this.createChatCompletion({ messages, ...options });
   }
 
-  /** Get AI usage summary for the current app. */
-  async getAiUsageSummary(): Promise<ApiResponse<AiUsageSummary>> {
-    return this.request<AiUsageSummary>(
-      "GET",
-      `/apps/${this.appId}/ai/usage/summary`,
-    );
+  /** Convenience: generate embeddings for a text string. */
+  async embed(
+    text: string,
+    model?: string,
+  ): Promise<ApiResponse<EmbeddingResponse>> {
+    return this.createEmbedding(text, model);
+  }
+
+  /** Convenience: check content for policy violations. */
+  async moderate(
+    text: string,
+    model?: string,
+  ): Promise<ApiResponse<ModerationResponse>> {
+    return this.createModeration(text, model);
+  }
+
+  /** Convenience: generate an image from a text prompt. */
+  async generateImage(
+    prompt: string,
+    options?: { n?: number; size?: string; model?: string },
+  ): Promise<ApiResponse<ImageGenerationResponse>> {
+    return this.createImage(prompt, options);
   }
 
   // --- Devices ---

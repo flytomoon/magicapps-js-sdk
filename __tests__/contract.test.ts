@@ -48,6 +48,9 @@ function setup() {
  * Sourced from apigateway_http.tf `route_key` values.
  */
 const API_ROUTES: Array<{ method: string; path: string }> = [
+  // Health check (lambda: ping)
+  { method: "GET", path: "/ping" },
+
   // Templates / Apps (lambda: templates)
   { method: "GET", path: "/apps" },
   { method: "GET", path: "/apps/availability" },
@@ -259,44 +262,6 @@ const FIXTURE_MODERATION = {
     total_tokens: 5,
     estimated_cost_usd: 0.0,
   },
-};
-
-// Source: lambda/ai_proxy/index.js handleGetUsageSummary (~line 457-474)
-// Response shape: { summaries: UsageSummary[] }
-const FIXTURE_AI_USAGE_SUMMARY = {
-  summaries: [
-    {
-      app_id: "test-app",
-      period: "MONTHLY#2026-03",
-      total_requests: 150,
-      total_input_tokens: 50000,
-      total_output_tokens: 25000,
-      total_estimated_cost_usd: 1.25,
-      updated_at: 1710000000000,
-    },
-  ],
-};
-
-// Source: lambda/ai_proxy/index.js handleGetUsage (~line 436-454)
-// Response shape: { usage: UsageRecord[], count: number }
-const FIXTURE_AI_USAGE = {
-  usage: [
-    {
-      usage_id: "usage-001",
-      app_id: "test-app",
-      provider_id: "openai",
-      model_id: "gpt-4",
-      request_type: "chat/completions",
-      input_tokens: 100,
-      output_tokens: 50,
-      total_tokens: 150,
-      latency_ms: 1200,
-      status: "success",
-      created_at: 1710000000000,
-      expires_at: 1712592000000,
-    },
-  ],
-  count: 1,
 };
 
 // Source: lambda/devices/index.js handler (~line 22-26)
@@ -980,55 +945,6 @@ describe("SDK <-> API Contract Validation", () => {
       expect(sentBody).not.toHaveProperty("model");
     });
 
-    it("getAiUsageSummary -> GET /apps/{app_id}/ai/usage/summary", async () => {
-      const { client, fetchSpy } = setup();
-      // Source: lambda/ai_proxy/index.js handleGetUsageSummary (~line 457-474)
-      // Response shape: { summaries: UsageSummary[] }
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => FIXTURE_AI_USAGE_SUMMARY,
-      });
-      await client.getAiUsageSummary();
-      expect(fetchSpy).toHaveBeenCalledWith(
-        `${BASE_URL}/apps/${APP_ID}/ai/usage/summary`,
-        expect.objectContaining({ method: "GET" }),
-      );
-      expect(routeExists("GET", `/apps/${APP_ID}/ai/usage/summary`)).toBe(true);
-    });
-
-    it("getAiUsage -> GET /apps/{app_id}/ai/usage", async () => {
-      const { client, fetchSpy } = setup();
-      // Source: lambda/ai_proxy/index.js handleGetUsage (~line 436-454)
-      // Response shape: { usage: UsageRecord[], count: number }
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => FIXTURE_AI_USAGE,
-      });
-      await client.getAiUsage();
-      expect(fetchSpy).toHaveBeenCalledWith(
-        `${BASE_URL}/apps/${APP_ID}/ai/usage`,
-        expect.objectContaining({ method: "GET" }),
-      );
-      expect(routeExists("GET", `/apps/${APP_ID}/ai/usage`)).toBe(true);
-    });
-
-    it("getAiUsage with options passes query params", async () => {
-      const { client, fetchSpy } = setup();
-      // Source: lambda/ai_proxy/index.js handleGetUsage (~line 436-454)
-      fetchSpy.mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => FIXTURE_AI_USAGE,
-      });
-      await client.getAiUsage({ limit: 10, start_date: "2026-01-01", end_date: "2026-03-13" });
-      const url = fetchSpy.mock.calls[0][0] as string;
-      expect(url).toContain("/ai/usage?");
-      expect(url).toContain("limit=10");
-      expect(url).toContain("start_date=2026-01-01");
-      expect(url).toContain("end_date=2026-03-13");
-    });
   });
 
   // -----------------------------------------------------------------------
@@ -1370,21 +1286,17 @@ describe("SDK <-> API Contract Validation", () => {
       await client.listLookupTables();
       expect(fetchSpy.mock.calls[2][1].body).toBeUndefined();
 
-      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_AI_USAGE_SUMMARY });
-      await client.getAiUsageSummary();
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+      await client.getSettings();
       expect(fetchSpy.mock.calls[3][1].body).toBeUndefined();
 
       fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
-      await client.getSettings();
+      await client.getConfig();
       expect(fetchSpy.mock.calls[4][1].body).toBeUndefined();
 
       fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
-      await client.getConfig();
-      expect(fetchSpy.mock.calls[5][1].body).toBeUndefined();
-
-      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
       await client.getCatalog();
-      expect(fetchSpy.mock.calls[6][1].body).toBeUndefined();
+      expect(fetchSpy.mock.calls[5][1].body).toBeUndefined();
     });
   });
 
@@ -1403,6 +1315,9 @@ describe("SDK <-> API Contract Validation", () => {
      * check below but included in the method count.
      */
     const sdkMethods: Array<{ name: string; method: string; path: string; skipRouteCheck?: boolean }> = [
+      // Health check
+      { name: "ping", method: "GET", path: "/ping" },
+
       // Templates / Apps
       { name: "getAppInfo", method: "GET", path: `/apps/${APP_ID}` },
       { name: "getTemplate", method: "GET", path: `/apps/${APP_ID}/templates/tmpl-1` },
@@ -1439,8 +1354,6 @@ describe("SDK <-> API Contract Validation", () => {
       { name: "createEmbedding", method: "POST", path: `/apps/${APP_ID}/ai/embeddings` },
       { name: "createImage", method: "POST", path: `/apps/${APP_ID}/ai/images/generations` },
       { name: "createModeration", method: "POST", path: `/apps/${APP_ID}/ai/moderations` },
-      { name: "getAiUsageSummary", method: "GET", path: `/apps/${APP_ID}/ai/usage/summary` },
-      { name: "getAiUsage", method: "GET", path: `/apps/${APP_ID}/ai/usage` },
 
       // Devices
       { name: "getDevices", method: "GET", path: `/apps/${APP_ID}/devices` },
@@ -1480,12 +1393,12 @@ describe("SDK <-> API Contract Validation", () => {
           name !== "request", // private helper, not a public API method
       );
 
-      // setAuthToken is a setter, not an API method
-      const apiMethods = publicMethods.filter((m) => m !== "setAuthToken");
+      // setAuthToken / clearAuthToken are setters, not API methods
+      const apiMethods = publicMethods.filter((m) => m !== "setAuthToken" && m !== "clearAuthToken");
 
       // Every API method should be listed in sdkMethods (or be a composite)
       const catalogedNames = new Set(sdkMethods.map((m) => m.name));
-      const composites = new Set(["getFullLookupTableDataset", "getAllDevices"]); // composite methods
+      const composites = new Set(["getFullLookupTableDataset", "getAllDevices", "chat", "embed", "moderate", "generateImage"]); // composite/convenience methods
 
       const uncovered = apiMethods.filter(
         (m) => !catalogedNames.has(m) && !composites.has(m),
@@ -1548,39 +1461,6 @@ describe("SDK <-> API Contract Validation", () => {
         expect(fixture.usage).toHaveProperty("total_tokens");
         expect(fixture.usage).toHaveProperty("estimated_cost_usd");
       }
-    });
-
-    it("AI usage summary has summaries array with correct fields", () => {
-      // Source: lambda/ai_proxy/index.js handleGetUsageSummary (~line 457-474)
-      expect(FIXTURE_AI_USAGE_SUMMARY).toHaveProperty("summaries");
-      expect(Array.isArray(FIXTURE_AI_USAGE_SUMMARY.summaries)).toBe(true);
-      const summary = FIXTURE_AI_USAGE_SUMMARY.summaries[0];
-      expect(summary).toHaveProperty("app_id");
-      expect(summary).toHaveProperty("period");
-      expect(summary).toHaveProperty("total_requests");
-      expect(summary).toHaveProperty("total_input_tokens");
-      expect(summary).toHaveProperty("total_output_tokens");
-      expect(summary).toHaveProperty("total_estimated_cost_usd");
-      expect(summary).toHaveProperty("updated_at");
-    });
-
-    it("AI usage response has usage array with correct fields", () => {
-      // Source: lambda/ai_proxy/index.js handleGetUsage (~line 436-454)
-      expect(FIXTURE_AI_USAGE).toHaveProperty("usage");
-      expect(FIXTURE_AI_USAGE).toHaveProperty("count");
-      const record = FIXTURE_AI_USAGE.usage[0];
-      expect(record).toHaveProperty("usage_id");
-      expect(record).toHaveProperty("app_id");
-      expect(record).toHaveProperty("provider_id");
-      expect(record).toHaveProperty("model_id");
-      expect(record).toHaveProperty("request_type");
-      expect(record).toHaveProperty("input_tokens");
-      expect(record).toHaveProperty("output_tokens");
-      expect(record).toHaveProperty("total_tokens");
-      expect(record).toHaveProperty("latency_ms");
-      expect(record).toHaveProperty("status");
-      expect(record).toHaveProperty("created_at");
-      expect(record).toHaveProperty("expires_at");
     });
 
     it("Devices response has items array (not devices)", () => {
