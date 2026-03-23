@@ -297,6 +297,131 @@ const { data: versionedChunk } = await client.getLookupTableChunk(
 const { data: fullData } = await client.getFullLookupTableDataset("table-id");
 ```
 
+## User Profiles
+
+```typescript
+// Get the current user's profile
+const { data: profile } = await client.getProfile();
+console.log(profile.display_name);
+
+// Update the current user's profile
+const { data: updated } = await client.updateProfile({
+  display_name: "Jane Doe",
+  bio: "Mobile developer",
+  preferences: { theme: "dark" },
+  custom_fields: { company: "Acme" },
+});
+
+// Get another user's public profile
+const { data: publicProfile } = await client.getPublicProfile("user-id");
+console.log(publicProfile.display_name);
+```
+
+## Account Management
+
+```typescript
+// Delete the current user's account (optional reason)
+await client.deleteAccount("No longer using the app");
+
+// Delete without a reason
+await client.deleteAccount();
+
+// Export account data
+const { data: exportData } = await client.exportAccountData();
+console.log(exportData.exported_at);
+
+// Get consent preferences
+const { data: consent } = await client.getConsent();
+console.log(consent.analytics);
+
+// Update consent preferences
+await client.updateConsent({
+  analytics: true,
+  marketing: false,
+  third_party: false,
+});
+```
+
+## File Storage
+
+```typescript
+// Get a pre-signed upload URL
+const { data: upload } = await client.getFileUploadUrl("photo.jpg", "image/jpeg");
+console.log(upload.upload_url);
+console.log(upload.file_id);
+
+// Upload the file using the pre-signed URL
+await fetch(upload.upload_url, {
+  method: "PUT",
+  body: fileData,
+  headers: { "Content-Type": "image/jpeg" },
+});
+
+// List all files
+const { data: fileList } = await client.listFiles();
+for (const file of fileList.files) {
+  console.log(`${file.filename}: ${file.content_type}`);
+}
+
+// Get a specific file
+const { data: file } = await client.getFile("file-id");
+
+// Delete a file
+await client.deleteFile("file-id");
+```
+
+## AI Conversations
+
+Manage persistent AI conversations with message history.
+
+```typescript
+// Create a new conversation
+const { data: conversation } = await client.createConversation({
+  title: "Help me debug",
+  model: "gpt-4",
+  system_prompt: "You are a helpful coding assistant.",
+});
+console.log(conversation.conversation_id);
+
+// List conversations (with optional pagination)
+const { data: list } = await client.listConversations();
+for (const conv of list.conversations) {
+  console.log(`${conv.title} (${conv.message_count} messages)`);
+}
+
+// Paginate through conversations
+const { data: page2 } = await client.listConversations(list.next_token);
+
+// Get a specific conversation
+const { data: conv } = await client.getConversation("conversation-id");
+
+// Send a message and get a response
+const { data: response } = await client.sendMessage(
+  "conversation-id",
+  "How do I fix a memory leak?",
+  { temperature: 0.7 },
+);
+console.log(response.message.content);
+
+// Delete a conversation
+await client.deleteConversation("conversation-id");
+```
+
+## Push Notifications
+
+```typescript
+// Register a device for push notifications
+const { data: registration } = await client.registerDevice(
+  "push-token-from-os",
+  "ios",
+  "optional-device-id",
+);
+console.log(registration.device_id);
+
+// Unregister a device
+await client.unregisterDevice("device-id");
+```
+
 ## Settings and Config
 
 ```typescript

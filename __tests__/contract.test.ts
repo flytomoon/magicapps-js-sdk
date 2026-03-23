@@ -133,6 +133,34 @@ const API_ROUTES: Array<{ method: string; path: string }> = [
   // Owner (lambda: settings / payment)
   { method: "POST", path: "/owner/register" },
   { method: "POST", path: "/owner/migrate" },
+
+  // User Profiles
+  { method: "GET", path: "/apps/{app_id}/profile" },
+  { method: "PUT", path: "/apps/{app_id}/profile" },
+  { method: "GET", path: "/apps/{app_id}/profile/{user_id}" },
+
+  // Account
+  { method: "DELETE", path: "/apps/{app_id}/account" },
+  { method: "GET", path: "/apps/{app_id}/account/data-export" },
+  { method: "GET", path: "/apps/{app_id}/account/consent" },
+  { method: "PUT", path: "/apps/{app_id}/account/consent" },
+
+  // File Storage
+  { method: "POST", path: "/apps/{app_id}/files/upload-url" },
+  { method: "GET", path: "/apps/{app_id}/files" },
+  { method: "GET", path: "/apps/{app_id}/files/{file_id}" },
+  { method: "DELETE", path: "/apps/{app_id}/files/{file_id}" },
+
+  // AI Conversations
+  { method: "POST", path: "/apps/{app_id}/ai/conversations" },
+  { method: "GET", path: "/apps/{app_id}/ai/conversations" },
+  { method: "GET", path: "/apps/{app_id}/ai/conversations/{conversation_id}" },
+  { method: "POST", path: "/apps/{app_id}/ai/conversations/{conversation_id}/messages" },
+  { method: "DELETE", path: "/apps/{app_id}/ai/conversations/{conversation_id}" },
+
+  // Push Notifications
+  { method: "POST", path: "/apps/{app_id}/notifications/register" },
+  { method: "DELETE", path: "/apps/{app_id}/notifications/register/{device_id}" },
 ];
 
 /**
@@ -148,7 +176,11 @@ function resolveRoute(path: string): string {
     .replace("{chunk_index}", "0")
     .replace("{provider_id}", "prov-1")
     .replace("{integration_id}", "int-1")
-    .replace("{icon_id}", "icon-1");
+    .replace("{icon_id}", "icon-1")
+    .replace("{user_id}", "user-1")
+    .replace("{file_id}", "file-1")
+    .replace("{conversation_id}", "conv-1")
+    .replace("{device_id}", "device-1");
 }
 
 /**
@@ -398,6 +430,116 @@ const FIXTURE_OWNER_REGISTERED = {
 // Response shape: { success: true }
 const FIXTURE_OWNER_MIGRATED = {
   success: true,
+};
+
+// User profile response
+const FIXTURE_USER_PROFILE = {
+  user_id: "user-1",
+  display_name: "Test User",
+  avatar_url: "https://example.com/avatar.png",
+  bio: "A test user",
+  preferences: { theme: "dark" },
+  custom_fields: { company: "Acme" },
+  created_at: "2024-01-01T00:00:00Z",
+  updated_at: "2024-01-02T00:00:00Z",
+};
+
+// Public profile response (limited fields)
+const FIXTURE_PUBLIC_PROFILE = {
+  user_id: "user-1",
+  display_name: "Test User",
+  avatar_url: "https://example.com/avatar.png",
+  bio: "A test user",
+};
+
+// Account deletion response
+const FIXTURE_ACCOUNT_DELETED = {
+  deleted: true,
+};
+
+// Account data export response
+const FIXTURE_ACCOUNT_DATA_EXPORT = {
+  data: { profile: { display_name: "Test User" }, events: [] },
+  exported_at: "2024-01-15T00:00:00Z",
+};
+
+// Consent preferences response
+const FIXTURE_CONSENT = {
+  analytics: true,
+  marketing: false,
+  third_party: false,
+};
+
+// File upload URL response
+const FIXTURE_FILE_UPLOAD_URL = {
+  upload_url: "https://s3.example.com/upload?signed=abc",
+  file_id: "file-1",
+  expires_at: 1712592000,
+};
+
+// Stored file response
+const FIXTURE_STORED_FILE = {
+  file_id: "file-1",
+  filename: "photo.jpg",
+  content_type: "image/jpeg",
+  size: 102400,
+  url: "https://cdn.example.com/file-1",
+  created_at: "2024-01-10T00:00:00Z",
+};
+
+// File list response
+const FIXTURE_FILE_LIST = {
+  files: [FIXTURE_STORED_FILE],
+};
+
+// File deleted response
+const FIXTURE_FILE_DELETED = {
+  deleted: true,
+};
+
+// AI conversation response
+const FIXTURE_CONVERSATION = {
+  conversation_id: "conv-1",
+  title: "Test Conversation",
+  model: "gpt-4",
+  created_at: "2024-01-10T00:00:00Z",
+  updated_at: "2024-01-10T00:00:00Z",
+  message_count: 0,
+  metadata: {},
+};
+
+// AI conversation list response
+const FIXTURE_CONVERSATION_LIST = {
+  conversations: [FIXTURE_CONVERSATION],
+  next_token: undefined,
+};
+
+// AI conversation message response
+const FIXTURE_SEND_MESSAGE = {
+  message: {
+    message_id: "msg-1",
+    role: "assistant" as const,
+    content: "Hello! How can I help?",
+    created_at: "2024-01-10T00:01:00Z",
+  },
+  conversation_id: "conv-1",
+};
+
+// AI conversation deleted response
+const FIXTURE_CONVERSATION_DELETED = {
+  deleted: true,
+};
+
+// Push notification device registration response
+const FIXTURE_DEVICE_REGISTRATION = {
+  device_id: "device-1",
+  platform: "ios",
+  registered_at: "2024-01-10T00:00:00Z",
+};
+
+// Push notification device unregistered response
+const FIXTURE_DEVICE_UNREGISTERED = {
+  unregistered: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -1197,6 +1339,412 @@ describe("SDK <-> API Contract Validation", () => {
   });
 
   // -----------------------------------------------------------------------
+  // User Profiles
+  // -----------------------------------------------------------------------
+
+  describe("User Profiles", () => {
+    it("getProfile -> GET /apps/{app_id}/profile", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_USER_PROFILE,
+      });
+      await client.getProfile();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/profile`,
+        expect.objectContaining({ method: "GET" }),
+      );
+      expect(routeExists("GET", `/apps/${APP_ID}/profile`)).toBe(true);
+    });
+
+    it("updateProfile -> PUT /apps/{app_id}/profile with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_USER_PROFILE,
+      });
+      const data = { display_name: "New Name", bio: "Updated bio" };
+      await client.updateProfile(data);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/profile`,
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify(data),
+        }),
+      );
+      expect(routeExists("PUT", `/apps/${APP_ID}/profile`)).toBe(true);
+    });
+
+    it("getPublicProfile -> GET /apps/{app_id}/profile/{user_id}", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_PUBLIC_PROFILE,
+      });
+      await client.getPublicProfile("user-1");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/profile/user-1`,
+        expect.objectContaining({ method: "GET" }),
+      );
+      expect(routeExists("GET", `/apps/${APP_ID}/profile/user-1`)).toBe(true);
+    });
+
+    it("getPublicProfile URL-encodes the user ID", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_PUBLIC_PROFILE,
+      });
+      await client.getPublicProfile("user with spaces");
+      const url = fetchSpy.mock.calls[0][0] as string;
+      expect(url).toBe(`${BASE_URL}/apps/${APP_ID}/profile/user%20with%20spaces`);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Account
+  // -----------------------------------------------------------------------
+
+  describe("Account", () => {
+    it("deleteAccount -> DELETE /apps/{app_id}/account with reason", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_ACCOUNT_DELETED,
+      });
+      await client.deleteAccount("no longer needed");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/account`,
+        expect.objectContaining({
+          method: "DELETE",
+          body: JSON.stringify({ reason: "no longer needed" }),
+        }),
+      );
+      expect(routeExists("DELETE", `/apps/${APP_ID}/account`)).toBe(true);
+    });
+
+    it("deleteAccount without reason sends no body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_ACCOUNT_DELETED,
+      });
+      await client.deleteAccount();
+      expect(fetchSpy.mock.calls[0][1].body).toBeUndefined();
+    });
+
+    it("exportAccountData -> GET /apps/{app_id}/account/data-export", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_ACCOUNT_DATA_EXPORT,
+      });
+      await client.exportAccountData();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/account/data-export`,
+        expect.objectContaining({ method: "GET" }),
+      );
+      expect(routeExists("GET", `/apps/${APP_ID}/account/data-export`)).toBe(true);
+    });
+
+    it("getConsent -> GET /apps/{app_id}/account/consent", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_CONSENT,
+      });
+      await client.getConsent();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/account/consent`,
+        expect.objectContaining({ method: "GET" }),
+      );
+      expect(routeExists("GET", `/apps/${APP_ID}/account/consent`)).toBe(true);
+    });
+
+    it("updateConsent -> PUT /apps/{app_id}/account/consent with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_CONSENT,
+      });
+      const consent = { analytics: true, marketing: false, third_party: false };
+      await client.updateConsent(consent);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/account/consent`,
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify(consent),
+        }),
+      );
+      expect(routeExists("PUT", `/apps/${APP_ID}/account/consent`)).toBe(true);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // File Storage
+  // -----------------------------------------------------------------------
+
+  describe("File Storage", () => {
+    it("getFileUploadUrl -> POST /apps/{app_id}/files/upload-url with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_FILE_UPLOAD_URL,
+      });
+      await client.getFileUploadUrl("photo.jpg", "image/jpeg");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/files/upload-url`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ filename: "photo.jpg", content_type: "image/jpeg" }),
+        }),
+      );
+      expect(routeExists("POST", `/apps/${APP_ID}/files/upload-url`)).toBe(true);
+    });
+
+    it("listFiles -> GET /apps/{app_id}/files", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_FILE_LIST,
+      });
+      await client.listFiles();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/files`,
+        expect.objectContaining({ method: "GET" }),
+      );
+      expect(routeExists("GET", `/apps/${APP_ID}/files`)).toBe(true);
+    });
+
+    it("getFile -> GET /apps/{app_id}/files/{file_id}", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_STORED_FILE,
+      });
+      await client.getFile("file-1");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/files/file-1`,
+        expect.objectContaining({ method: "GET" }),
+      );
+      expect(routeExists("GET", `/apps/${APP_ID}/files/file-1`)).toBe(true);
+    });
+
+    it("deleteFile -> DELETE /apps/{app_id}/files/{file_id}", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_FILE_DELETED,
+      });
+      await client.deleteFile("file-1");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/files/file-1`,
+        expect.objectContaining({ method: "DELETE" }),
+      );
+      expect(routeExists("DELETE", `/apps/${APP_ID}/files/file-1`)).toBe(true);
+    });
+
+    it("getFile URL-encodes the file ID", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_STORED_FILE,
+      });
+      await client.getFile("file with spaces");
+      const url = fetchSpy.mock.calls[0][0] as string;
+      expect(url).toBe(`${BASE_URL}/apps/${APP_ID}/files/file%20with%20spaces`);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // AI Conversations
+  // -----------------------------------------------------------------------
+
+  describe("AI Conversations", () => {
+    it("createConversation -> POST /apps/{app_id}/ai/conversations", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: async () => FIXTURE_CONVERSATION,
+      });
+      await client.createConversation({ title: "Test", model: "gpt-4" });
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/ai/conversations`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ title: "Test", model: "gpt-4" }),
+        }),
+      );
+      expect(routeExists("POST", `/apps/${APP_ID}/ai/conversations`)).toBe(true);
+    });
+
+    it("createConversation without options sends no body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 201,
+        json: async () => FIXTURE_CONVERSATION,
+      });
+      await client.createConversation();
+      expect(fetchSpy.mock.calls[0][1].body).toBeUndefined();
+    });
+
+    it("listConversations -> GET /apps/{app_id}/ai/conversations", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_CONVERSATION_LIST,
+      });
+      await client.listConversations();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/ai/conversations`,
+        expect.objectContaining({ method: "GET" }),
+      );
+      expect(routeExists("GET", `/apps/${APP_ID}/ai/conversations`)).toBe(true);
+    });
+
+    it("listConversations passes next_token as query param", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_CONVERSATION_LIST,
+      });
+      await client.listConversations("abc123");
+      const url = fetchSpy.mock.calls[0][0] as string;
+      expect(url).toBe(`${BASE_URL}/apps/${APP_ID}/ai/conversations?next_token=abc123`);
+    });
+
+    it("getConversation -> GET /apps/{app_id}/ai/conversations/{id}", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_CONVERSATION,
+      });
+      await client.getConversation("conv-1");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/ai/conversations/conv-1`,
+        expect.objectContaining({ method: "GET" }),
+      );
+      expect(routeExists("GET", `/apps/${APP_ID}/ai/conversations/conv-1`)).toBe(true);
+    });
+
+    it("sendMessage -> POST /apps/{app_id}/ai/conversations/{id}/messages with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_SEND_MESSAGE,
+      });
+      await client.sendMessage("conv-1", "Hello!", { temperature: 0.7 });
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/ai/conversations/conv-1/messages`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ content: "Hello!", temperature: 0.7 }),
+        }),
+      );
+      expect(routeExists("POST", `/apps/${APP_ID}/ai/conversations/conv-1/messages`)).toBe(true);
+    });
+
+    it("sendMessage without options sends only content", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_SEND_MESSAGE,
+      });
+      await client.sendMessage("conv-1", "Hello!");
+      const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(sentBody).toEqual({ content: "Hello!" });
+    });
+
+    it("deleteConversation -> DELETE /apps/{app_id}/ai/conversations/{id}", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_CONVERSATION_DELETED,
+      });
+      await client.deleteConversation("conv-1");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/ai/conversations/conv-1`,
+        expect.objectContaining({ method: "DELETE" }),
+      );
+      expect(routeExists("DELETE", `/apps/${APP_ID}/ai/conversations/conv-1`)).toBe(true);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Push Notifications
+  // -----------------------------------------------------------------------
+
+  describe("Push Notifications", () => {
+    it("registerDevice -> POST /apps/{app_id}/notifications/register with correct body", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_DEVICE_REGISTRATION,
+      });
+      await client.registerDevice("push-token-abc", "ios", "device-1");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/notifications/register`,
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ token: "push-token-abc", platform: "ios", device_id: "device-1" }),
+        }),
+      );
+      expect(routeExists("POST", `/apps/${APP_ID}/notifications/register`)).toBe(true);
+    });
+
+    it("registerDevice omits device_id when not provided", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_DEVICE_REGISTRATION,
+      });
+      await client.registerDevice("push-token-abc", "android");
+      const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(sentBody).toEqual({ token: "push-token-abc", platform: "android" });
+      expect(sentBody).not.toHaveProperty("device_id");
+    });
+
+    it("unregisterDevice -> DELETE /apps/{app_id}/notifications/register/{device_id}", async () => {
+      const { client, fetchSpy } = setup();
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => FIXTURE_DEVICE_UNREGISTERED,
+      });
+      await client.unregisterDevice("device-1");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${BASE_URL}/apps/${APP_ID}/notifications/register/device-1`,
+        expect.objectContaining({ method: "DELETE" }),
+      );
+      expect(routeExists("DELETE", `/apps/${APP_ID}/notifications/register/device-1`)).toBe(true);
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // Request body shape validation
   // -----------------------------------------------------------------------
 
@@ -1297,6 +1845,38 @@ describe("SDK <-> API Contract Validation", () => {
       fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
       await client.getCatalog();
       expect(fetchSpy.mock.calls[5][1].body).toBeUndefined();
+
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_USER_PROFILE });
+      await client.getProfile();
+      expect(fetchSpy.mock.calls[6][1].body).toBeUndefined();
+
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_PUBLIC_PROFILE });
+      await client.getPublicProfile("user-1");
+      expect(fetchSpy.mock.calls[7][1].body).toBeUndefined();
+
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_ACCOUNT_DATA_EXPORT });
+      await client.exportAccountData();
+      expect(fetchSpy.mock.calls[8][1].body).toBeUndefined();
+
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_CONSENT });
+      await client.getConsent();
+      expect(fetchSpy.mock.calls[9][1].body).toBeUndefined();
+
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_FILE_LIST });
+      await client.listFiles();
+      expect(fetchSpy.mock.calls[10][1].body).toBeUndefined();
+
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_STORED_FILE });
+      await client.getFile("file-1");
+      expect(fetchSpy.mock.calls[11][1].body).toBeUndefined();
+
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_CONVERSATION_LIST });
+      await client.listConversations();
+      expect(fetchSpy.mock.calls[12][1].body).toBeUndefined();
+
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_CONVERSATION });
+      await client.getConversation("conv-1");
+      expect(fetchSpy.mock.calls[13][1].body).toBeUndefined();
     });
   });
 
@@ -1372,6 +1952,34 @@ describe("SDK <-> API Contract Validation", () => {
       { name: "getLookupTable", method: "GET", path: "/lookup-tables/lt-1" },
       { name: "getLookupTableChunk", method: "GET", path: "/lookup-tables/lt-1/chunks/0" },
       // getFullLookupTableDataset and getAllDevices are composites
+
+      // User Profiles
+      { name: "getProfile", method: "GET", path: `/apps/${APP_ID}/profile` },
+      { name: "updateProfile", method: "PUT", path: `/apps/${APP_ID}/profile` },
+      { name: "getPublicProfile", method: "GET", path: `/apps/${APP_ID}/profile/user-1` },
+
+      // Account
+      { name: "deleteAccount", method: "DELETE", path: `/apps/${APP_ID}/account` },
+      { name: "exportAccountData", method: "GET", path: `/apps/${APP_ID}/account/data-export` },
+      { name: "getConsent", method: "GET", path: `/apps/${APP_ID}/account/consent` },
+      { name: "updateConsent", method: "PUT", path: `/apps/${APP_ID}/account/consent` },
+
+      // File Storage
+      { name: "getFileUploadUrl", method: "POST", path: `/apps/${APP_ID}/files/upload-url` },
+      { name: "listFiles", method: "GET", path: `/apps/${APP_ID}/files` },
+      { name: "getFile", method: "GET", path: `/apps/${APP_ID}/files/file-1` },
+      { name: "deleteFile", method: "DELETE", path: `/apps/${APP_ID}/files/file-1` },
+
+      // AI Conversations
+      { name: "createConversation", method: "POST", path: `/apps/${APP_ID}/ai/conversations` },
+      { name: "listConversations", method: "GET", path: `/apps/${APP_ID}/ai/conversations` },
+      { name: "getConversation", method: "GET", path: `/apps/${APP_ID}/ai/conversations/conv-1` },
+      { name: "sendMessage", method: "POST", path: `/apps/${APP_ID}/ai/conversations/conv-1/messages` },
+      { name: "deleteConversation", method: "DELETE", path: `/apps/${APP_ID}/ai/conversations/conv-1` },
+
+      // Push Notifications
+      { name: "registerDevice", method: "POST", path: `/apps/${APP_ID}/notifications/register` },
+      { name: "unregisterDevice", method: "DELETE", path: `/apps/${APP_ID}/notifications/register/device-1` },
     ];
 
     it.each(sdkMethods.filter((m) => !m.skipRouteCheck))(

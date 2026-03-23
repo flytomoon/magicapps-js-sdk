@@ -209,3 +209,128 @@ export interface RegistryApp {
   status?: string;
   visibility?: string;
 }
+
+// --- User Profile Types ---
+
+/** A user profile. */
+export interface UserProfile {
+  user_id: string;
+  display_name?: string;
+  avatar_url?: string;
+  bio?: string;
+  preferences?: Record<string, unknown>;
+  custom_fields?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** Fields that can be updated on a user profile. */
+export interface UpdateProfileData {
+  display_name?: string;
+  avatar_url?: string;
+  bio?: string;
+  preferences?: Record<string, unknown>;
+  custom_fields?: Record<string, unknown>;
+}
+
+/** A public user profile (limited fields). */
+export interface PublicProfile {
+  user_id: string;
+  display_name?: string;
+  avatar_url?: string;
+  bio?: string;
+}
+
+// --- Account Types ---
+
+/** Request body for account deletion. */
+export interface DeleteAccountRequest {
+  reason?: string;
+}
+
+/** Response from account data export. */
+export interface AccountDataExport {
+  data: Record<string, unknown>;
+  exported_at: string;
+}
+
+/** User consent preferences. */
+export interface ConsentPreferences {
+  analytics?: boolean;
+  marketing?: boolean;
+  third_party?: boolean;
+  [key: string]: unknown;
+}
+
+// --- File Storage Types ---
+
+/** Response from requesting a file upload URL. */
+export interface FileUploadUrl {
+  upload_url: string;
+  file_id: string;
+  expires_at?: number;
+}
+
+/** A stored file. */
+export interface StoredFile {
+  file_id: string;
+  filename: string;
+  content_type: string;
+  size?: number;
+  url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// --- AI Conversation Types ---
+
+/** Options for creating a conversation. */
+export interface CreateConversationOptions {
+  title?: string;
+  model?: string;
+  system_prompt?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** An AI conversation. */
+export interface Conversation {
+  conversation_id: string;
+  title?: string;
+  model?: string;
+  created_at?: string;
+  updated_at?: string;
+  message_count?: number;
+  metadata?: Record<string, unknown>;
+}
+
+/** A message in an AI conversation. */
+export interface ConversationMessage {
+  message_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  created_at?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** Options for sending a message. */
+export interface SendMessageOptions {
+  model?: string;
+  temperature?: number;
+  max_tokens?: number;
+  metadata?: Record<string, unknown>;
+}
+
+/** Response from sending a message in a conversation. */
+export interface SendMessageResponse {
+  message: ConversationMessage;
+  conversation_id: string;
+}
+
+// --- Push Notification Types ---
+
+/** Response from registering a device for push notifications. */
+export interface DeviceRegistration {
+  device_id: string;
+  platform: string;
+  registered_at?: string;
+}

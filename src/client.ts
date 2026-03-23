@@ -11,6 +11,19 @@ import type {
   Device,
   DeviceCatalogResponse,
   AuthTokenResponse,
+  UserProfile,
+  UpdateProfileData,
+  PublicProfile,
+  AccountDataExport,
+  ConsentPreferences,
+  FileUploadUrl,
+  StoredFile,
+  CreateConversationOptions,
+  Conversation,
+  ConversationMessage,
+  SendMessageOptions,
+  SendMessageResponse,
+  DeviceRegistration,
 } from "./types.js";
 import { ApiError, MagicAppsError } from "./errors.js";
 
@@ -491,6 +504,200 @@ export class MagicAppsClient {
     empty?: boolean;
   }>> {
     return this.request("GET", `/events/${slug}`);
+  }
+
+  // --- User Profiles ---
+
+  /** Get the current user's profile. */
+  async getProfile(): Promise<ApiResponse<UserProfile>> {
+    return this.request<UserProfile>(
+      "GET",
+      `/apps/${this.appId}/profile`,
+    );
+  }
+
+  /** Update the current user's profile. */
+  async updateProfile(
+    data: UpdateProfileData,
+  ): Promise<ApiResponse<UserProfile>> {
+    return this.request<UserProfile>(
+      "PUT",
+      `/apps/${this.appId}/profile`,
+      data,
+    );
+  }
+
+  /** Get a user's public profile by user ID. */
+  async getPublicProfile(
+    userId: string,
+  ): Promise<ApiResponse<PublicProfile>> {
+    return this.request<PublicProfile>(
+      "GET",
+      `/apps/${this.appId}/profile/${encodeURIComponent(userId)}`,
+    );
+  }
+
+  // --- Account ---
+
+  /** Delete the current user's account. Accepts an optional reason. */
+  async deleteAccount(
+    reason?: string,
+  ): Promise<ApiResponse<{ deleted: boolean }>> {
+    return this.request<{ deleted: boolean }>(
+      "DELETE",
+      `/apps/${this.appId}/account`,
+      reason !== undefined ? { reason } : undefined,
+    );
+  }
+
+  /** Export the current user's account data. */
+  async exportAccountData(): Promise<ApiResponse<AccountDataExport>> {
+    return this.request<AccountDataExport>(
+      "GET",
+      `/apps/${this.appId}/account/data-export`,
+    );
+  }
+
+  /** Get the current user's consent preferences. */
+  async getConsent(): Promise<ApiResponse<ConsentPreferences>> {
+    return this.request<ConsentPreferences>(
+      "GET",
+      `/apps/${this.appId}/account/consent`,
+    );
+  }
+
+  /** Update the current user's consent preferences. */
+  async updateConsent(
+    consent: ConsentPreferences,
+  ): Promise<ApiResponse<ConsentPreferences>> {
+    return this.request<ConsentPreferences>(
+      "PUT",
+      `/apps/${this.appId}/account/consent`,
+      consent,
+    );
+  }
+
+  // --- File Storage ---
+
+  /** Get a pre-signed upload URL for a file. */
+  async getFileUploadUrl(
+    filename: string,
+    contentType: string,
+  ): Promise<ApiResponse<FileUploadUrl>> {
+    return this.request<FileUploadUrl>(
+      "POST",
+      `/apps/${this.appId}/files/upload-url`,
+      { filename, content_type: contentType },
+    );
+  }
+
+  /** List all files for the current user. */
+  async listFiles(): Promise<ApiResponse<{ files: StoredFile[] }>> {
+    return this.request<{ files: StoredFile[] }>(
+      "GET",
+      `/apps/${this.appId}/files`,
+    );
+  }
+
+  /** Get a specific file by ID. */
+  async getFile(fileId: string): Promise<ApiResponse<StoredFile>> {
+    return this.request<StoredFile>(
+      "GET",
+      `/apps/${this.appId}/files/${encodeURIComponent(fileId)}`,
+    );
+  }
+
+  /** Delete a specific file by ID. */
+  async deleteFile(fileId: string): Promise<ApiResponse<{ deleted: boolean }>> {
+    return this.request<{ deleted: boolean }>(
+      "DELETE",
+      `/apps/${this.appId}/files/${encodeURIComponent(fileId)}`,
+    );
+  }
+
+  // --- AI Conversations ---
+
+  /** Create a new AI conversation. */
+  async createConversation(
+    options?: CreateConversationOptions,
+  ): Promise<ApiResponse<Conversation>> {
+    return this.request<Conversation>(
+      "POST",
+      `/apps/${this.appId}/ai/conversations`,
+      options,
+    );
+  }
+
+  /** List AI conversations for the current user. */
+  async listConversations(
+    nextToken?: string,
+  ): Promise<ApiResponse<{ conversations: Conversation[]; next_token?: string }>> {
+    const params = new URLSearchParams();
+    if (nextToken) params.set("next_token", nextToken);
+    const query = params.toString();
+    const path = `/apps/${this.appId}/ai/conversations${query ? `?${query}` : ""}`;
+    return this.request<{ conversations: Conversation[]; next_token?: string }>(
+      "GET",
+      path,
+    );
+  }
+
+  /** Get a specific AI conversation by ID. */
+  async getConversation(
+    conversationId: string,
+  ): Promise<ApiResponse<Conversation>> {
+    return this.request<Conversation>(
+      "GET",
+      `/apps/${this.appId}/ai/conversations/${encodeURIComponent(conversationId)}`,
+    );
+  }
+
+  /** Send a message in an AI conversation. */
+  async sendMessage(
+    conversationId: string,
+    content: string,
+    options?: SendMessageOptions,
+  ): Promise<ApiResponse<SendMessageResponse>> {
+    return this.request<SendMessageResponse>(
+      "POST",
+      `/apps/${this.appId}/ai/conversations/${encodeURIComponent(conversationId)}/messages`,
+      { content, ...options },
+    );
+  }
+
+  /** Delete an AI conversation. */
+  async deleteConversation(
+    conversationId: string,
+  ): Promise<ApiResponse<{ deleted: boolean }>> {
+    return this.request<{ deleted: boolean }>(
+      "DELETE",
+      `/apps/${this.appId}/ai/conversations/${encodeURIComponent(conversationId)}`,
+    );
+  }
+
+  // --- Push Notifications ---
+
+  /** Register a device for push notifications. */
+  async registerDevice(
+    token: string,
+    platform: string,
+    deviceId?: string,
+  ): Promise<ApiResponse<DeviceRegistration>> {
+    return this.request<DeviceRegistration>(
+      "POST",
+      `/apps/${this.appId}/notifications/register`,
+      { token, platform, ...(deviceId ? { device_id: deviceId } : {}) },
+    );
+  }
+
+  /** Unregister a device from push notifications. */
+  async unregisterDevice(
+    deviceId: string,
+  ): Promise<ApiResponse<{ unregistered: boolean }>> {
+    return this.request<{ unregistered: boolean }>(
+      "DELETE",
+      `/apps/${this.appId}/notifications/register/${encodeURIComponent(deviceId)}`,
+    );
   }
 
   private async request<T>(

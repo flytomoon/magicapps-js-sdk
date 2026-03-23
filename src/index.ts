@@ -22,6 +22,20 @@ export type {
   DeviceCatalogResponse,
   RegistryApp,
   AuthTokenResponse,
+  UserProfile,
+  UpdateProfileData,
+  PublicProfile,
+  DeleteAccountRequest,
+  AccountDataExport,
+  ConsentPreferences,
+  FileUploadUrl,
+  StoredFile,
+  CreateConversationOptions,
+  Conversation,
+  ConversationMessage,
+  SendMessageOptions,
+  SendMessageResponse,
+  DeviceRegistration,
 } from "./types.js";
 export { MagicAppsError, ApiError } from "./errors.js";
 export {
