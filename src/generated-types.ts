@@ -45,9 +45,89 @@ export interface AIProvider {
   updated_at?: string;
 }
 
+export interface AIConversation {
+  conversation_id?: string;
+  title?: string;
+  message_count?: number;
+  created_at?: number;
+  updated_at?: number;
+}
+
+export interface AIConversationDetail {
+  conversation_id?: string;
+  title?: string;
+  message_count?: number;
+  created_at?: number;
+  updated_at?: number;
+  system_prompt?: string;
+  metadata?: Record<string, unknown>;
+  messages?: number[];
+}
+
+export interface AITool {
+  tool_id?: string;
+  app_id?: string;
+  name?: string;
+  description?: string;
+  input_schema?: Record<string, unknown>;
+  endpoint_url?: string;
+  status?: 'active' | 'disabled';
+  created_at?: number;
+}
+
 export interface ErrorResponse {
   error: string;
   message: string;
+}
+
+/** Full user profile (returned to the profile owner) */
+export interface UserProfile {
+  user_id?: string;
+  app_id?: string;
+  display_name?: string;
+  avatar_url?: string;
+  bio?: string;
+  preferences?: Record<string, unknown>;
+  custom_fields?: Record<string, unknown>;
+  /** Unix timestamp in milliseconds */
+  created_at?: number;
+  /** Unix timestamp in milliseconds */
+  updated_at?: number;
+}
+
+/** Public user profile (visible to other users) */
+export interface UserProfilePublic {
+  user_id?: string;
+  display_name?: string;
+  avatar_url?: string;
+  bio?: string;
+}
+
+export interface Webhook {
+  webhook_id?: string;
+  tenant_id?: string;
+  app_id?: string;
+  url?: string;
+  events?: string[];
+  /** Masked in list/detail responses; shown in full only on creation */
+  secret?: string;
+  description?: string;
+  status?: string;
+  created_at?: number;
+  updated_at?: number;
+}
+
+export interface WebhookDelivery {
+  delivery_id?: string;
+  webhook_id?: string;
+  event_type?: string;
+  payload?: string;
+  success?: boolean;
+  status_code?: number;
+  response_body?: string;
+  latency_ms?: number;
+  error?: string | null;
+  created_at?: number;
 }
 
 export interface LookupTableSummary {
