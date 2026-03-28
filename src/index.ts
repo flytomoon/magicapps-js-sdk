@@ -36,6 +36,10 @@ export type {
   SendMessageOptions,
   SendMessageResponse,
   DeviceRegistration,
+  SubscriptionTier,
+  SubscriptionDetails,
+  SubscriptionResponse,
+  CustomerPortalResponse,
 } from "./types.js";
 export { MagicAppsError, ApiError } from "./errors.js";
 export {

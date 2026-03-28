@@ -24,6 +24,8 @@ import type {
   SendMessageOptions,
   SendMessageResponse,
   DeviceRegistration,
+  SubscriptionResponse,
+  CustomerPortalResponse,
 } from "./types.js";
 import { ApiError, MagicAppsError } from "./errors.js";
 
@@ -672,6 +674,27 @@ export class MagicAppsClient {
     return this.request<{ deleted: boolean }>(
       "DELETE",
       `/apps/${this.appId}/ai/conversations/${encodeURIComponent(conversationId)}`,
+    );
+  }
+
+  // --- Payments / Subscriptions ---
+
+  /** Get the current user's subscription status and entitlement for the app. */
+  async getSubscription(): Promise<ApiResponse<SubscriptionResponse>> {
+    return this.request<SubscriptionResponse>(
+      "GET",
+      `/apps/${this.appId}/subscription`,
+    );
+  }
+
+  /** Get a Stripe customer portal URL for the current user. The user will be redirected back to returnUrl after managing their subscription. */
+  async getCustomerPortalUrl(
+    returnUrl: string,
+  ): Promise<ApiResponse<CustomerPortalResponse>> {
+    return this.request<CustomerPortalResponse>(
+      "POST",
+      `/apps/${this.appId}/billing/portal`,
+      { return_url: returnUrl },
     );
   }
 

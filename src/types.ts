@@ -334,3 +334,38 @@ export interface DeviceRegistration {
   platform: string;
   registered_at?: string;
 }
+
+// --- Payment / Subscription Types ---
+
+/** A subscription tier definition. */
+export interface SubscriptionTier {
+  tier_id: string;
+  name: string;
+  billing_type: string;
+  billing_interval?: string;
+}
+
+/** Stripe subscription details. */
+export interface SubscriptionDetails {
+  stripe_subscription_id: string;
+  status: string;
+  current_period_start: string;
+  current_period_end: string;
+  cancel_at_period_end: boolean;
+}
+
+/** Response from the subscription status endpoint. */
+export interface SubscriptionResponse {
+  has_entitlement: boolean;
+  entitlement_id?: string;
+  tier?: SubscriptionTier;
+  status?: string;
+  source?: string;
+  subscription?: SubscriptionDetails | null;
+  created_at?: number;
+}
+
+/** Response from the customer portal URL endpoint. */
+export interface CustomerPortalResponse {
+  url: string;
+}
