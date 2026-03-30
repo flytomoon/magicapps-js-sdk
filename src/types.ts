@@ -369,3 +369,48 @@ export interface SubscriptionResponse {
 export interface CustomerPortalResponse {
   url: string;
 }
+
+// --- Entitlement Types ---
+
+/** Entitlement status for the current user. */
+export interface EntitlementStatus {
+  entitlement_active: boolean;
+  entitlement_state: "active" | "inactive" | "pending_sync" | "error_retryable";
+  entitlement_id: string | null;
+  source: string | null;
+  tier_id: string | null;
+  tier_name: string | null;
+  billing_type: string | null;
+  pending_tier_id: string | null;
+  created_at: number | null;
+}
+
+// --- Tier Types ---
+
+/** A tier definition for an application. */
+export interface AppTier {
+  tier_id: string;
+  name: string;
+  slug: string;
+  description: string;
+  billing_type: "one_time" | "recurring";
+  billing_interval: string | null;
+  price_cents: number;
+  currency: string;
+  features: string[];
+  is_default: boolean;
+}
+
+/** Response from the tiers endpoint. */
+export interface TiersResponse {
+  app_slug: string;
+  has_tiers: boolean;
+  tiers: AppTier[];
+}
+
+/** Response from changing a subscription tier. */
+export interface ChangeSubscriptionResponse {
+  success: boolean;
+  upgrade: boolean;
+  new_tier_id: string;
+}

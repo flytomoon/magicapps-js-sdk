@@ -26,61 +26,29 @@ import type {
   DeviceRegistration,
   SubscriptionResponse,
   CustomerPortalResponse,
+  EntitlementStatus,
+  TiersResponse,
+  ChangeSubscriptionResponse,
 } from "./types.js";
 import { ApiError, MagicAppsError } from "./errors.js";
 
 const DEFAULT_TIMEOUT = 30_000;
 
-/** MagicApps API client for TypeScript/JavaScript applications. */
-export class MagicAppsClient {
-  private readonly baseUrl: string;
-  private readonly appId: string;
-  private authToken: string | undefined;
-  private readonly timeout: number;
+/** Type for the internal request function passed to service classes. */
+type RequestFn = <T>(
+  method: string,
+  path: string,
+  body?: unknown,
+) => Promise<ApiResponse<T>>;
 
-  constructor(config: MagicAppsConfig) {
-    if (!config.baseUrl) {
-      throw new MagicAppsError("baseUrl is required");
-    }
-    if (!config.appId) {
-      throw new MagicAppsError("appId is required");
-    }
+// --- Service Classes ---
 
-    this.baseUrl = config.baseUrl.replace(/\/+$/, "");
-    this.appId = config.appId;
-    this.authToken = config.authToken;
-    this.timeout = config.timeout ?? DEFAULT_TIMEOUT;
-  }
-
-  /** Update the auth token (e.g. after login or token refresh). */
-  setAuthToken(token: string): void {
-    this.authToken = token;
-  }
-
-  /** Clear the auth token (e.g. on logout). */
-  clearAuthToken(): void {
-    this.authToken = undefined;
-  }
-
-  /** Health check - verifies connectivity to the MagicApps API. */
-  async ping(): Promise<ApiResponse<{ message: string }>> {
-    return this.request<{ message: string }>("GET", "/ping");
-  }
-
-  /** Get information about the current application. */
-  async getAppInfo(): Promise<ApiResponse<AppInfo>> {
-    return this.request<AppInfo>("GET", `/apps/${this.appId}`);
-  }
-
-  /** Get a specific template by ID. */
-  async getTemplate(templateId: string): Promise<ApiResponse<any>> {
-    return this.request(
-      "GET",
-      `/apps/${this.appId}/templates/${templateId}`,
-    );
-  }
-
-  // --- Auth ---
+/** Authentication methods (OAuth, passkeys, magic links). */
+export class AuthService {
+  constructor(
+    private request: RequestFn,
+    private appId: string,
+  ) {}
 
   /** Exchange an Apple identity token for MagicApps auth tokens. */
   async appleExchangeToken(
@@ -183,90 +151,99 @@ export class MagicAppsClient {
       { token },
     );
   }
+}
 
-  // --- Owner ---
+/** Payment and subscription methods. */
+export class PaymentsService {
+  constructor(
+    private request: RequestFn,
+    private appId: string,
+  ) {}
 
-  /** Register a device owner for the given app. */
-  async registerOwner(
-    deviceOwnerId: string,
-    appId: string,
-    hcaptchaToken?: string,
-  ): Promise<ApiResponse<{ owner_token: string }>> {
-    return this.request(
-      "POST",
-      "/owner/register",
-      { device_owner_id: deviceOwnerId, app_id: appId, ...(hcaptchaToken ? { hcaptcha_token: hcaptchaToken } : {}) },
-    );
-  }
-
-  /** Migrate a device owner to a full user account. */
-  async migrateOwnerToUser(
-    deviceOwnerId: string,
-    appId: string,
-  ): Promise<ApiResponse<{ success: boolean }>> {
-    return this.request(
-      "POST",
-      "/owner/migrate",
-      { device_owner_id: deviceOwnerId, app_id: appId },
-    );
-  }
-
-  // --- Settings / Config ---
-
-  /** Get the settings for the current app. */
-  async getSettings(): Promise<ApiResponse<any>> {
-    return this.request("GET", `/apps/${this.appId}/settings`);
-  }
-
-  /** Update the settings for the current app. */
-  async updateSettings(
-    body: Record<string, any>,
-  ): Promise<ApiResponse<any>> {
-    return this.request("PUT", `/apps/${this.appId}/settings`, body);
-  }
-
-  /** Get the config for the current app. */
-  async getConfig(): Promise<ApiResponse<any>> {
-    return this.request("GET", `/apps/${this.appId}/config`);
-  }
-
-  /** Update the config for the current app. */
-  async updateConfig(
-    body: Record<string, any>,
-  ): Promise<ApiResponse<any>> {
-    return this.request("PUT", `/apps/${this.appId}/config`, body);
-  }
-
-  /** Get the secret for a specific integration. */
-  async getIntegrationSecret(
-    integrationId: string,
-  ): Promise<ApiResponse<any>> {
-    return this.request(
+  /** Get the current user's subscription status and entitlement for the app. */
+  async getSubscription(): Promise<ApiResponse<SubscriptionResponse>> {
+    return this.request<SubscriptionResponse>(
       "GET",
-      `/apps/${this.appId}/integrations/${encodeURIComponent(integrationId)}/secret`,
+      `/apps/${this.appId}/subscription`,
     );
   }
 
-  /** Upload or update the secret for a specific integration. */
-  async uploadIntegrationSecret(
-    integrationId: string,
-    body: Record<string, any>,
-  ): Promise<ApiResponse<any>> {
-    return this.request(
+  /** Get a Stripe customer portal URL for the current user. */
+  async getCustomerPortalUrl(
+    returnUrl: string,
+  ): Promise<ApiResponse<CustomerPortalResponse>> {
+    return this.request<CustomerPortalResponse>(
       "POST",
-      `/apps/${this.appId}/integrations/${encodeURIComponent(integrationId)}/secret`,
-      body,
+      `/apps/${this.appId}/billing/portal`,
+      { return_url: returnUrl },
     );
   }
 
-  // --- Catalog ---
-
-  /** Get the catalog for the current app. */
-  async getCatalog(): Promise<ApiResponse<any>> {
-    return this.request("GET", `/apps/${this.appId}/catalog`);
+  /** Get available tiers for the current app. */
+  async getTiers(): Promise<ApiResponse<TiersResponse>> {
+    return this.request<TiersResponse>(
+      "GET",
+      `/pay/apps/${this.appId}/tiers`,
+    );
   }
 
-  // --- AI Services ---
+  /** Change the current user's subscription to a different tier. */
+  async changeSubscription(
+    newTierId: string,
+  ): Promise<ApiResponse<ChangeSubscriptionResponse>> {
+    return this.request<ChangeSubscriptionResponse>(
+      "POST",
+      `/pay/subscription/change`,
+      { new_tier_id: newTierId },
+    );
+  }
+}
+
+/** Entitlement checking methods. */
+export class EntitlementsService {
+  constructor(
+    private request: RequestFn,
+    private appId: string,
+  ) {}
+
+  /** Check the current user's entitlement status for the app. */
+  async check(): Promise<ApiResponse<EntitlementStatus>> {
+    return this.request<EntitlementStatus>(
+      "GET",
+      `/apps/${this.appId}/entitlements`,
+    );
+  }
+}
+
+/** Device catalog methods. */
+export class DevicesService {
+  constructor(
+    private request: RequestFn,
+    private appId: string,
+  ) {}
+
+  /** Fetch the device catalog for the current app. */
+  async getDevices(): Promise<ApiResponse<DeviceCatalogResponse>> {
+    return this.request<DeviceCatalogResponse>(
+      "GET",
+      `/apps/${this.appId}/devices`,
+    );
+  }
+
+  /** Convenience: get a flat list of all devices from the catalog. */
+  async getAllDevices(): Promise<Device[]> {
+    const response = await this.getDevices();
+    const catalog = response.data;
+    return catalog.devices ?? [];
+  }
+}
+
+/** AI proxy and conversation methods. */
+export class AIService {
+  constructor(
+    private request: RequestFn,
+    private appId: string,
+  ) {}
 
   /** Create a chat completion via the AI proxy (OpenAI-compatible format). */
   async createChatCompletion(
@@ -315,8 +292,6 @@ export class MagicAppsClient {
     );
   }
 
-  // --- AI Convenience Methods ---
-
   /** Convenience: create a chat completion from a messages array. */
   async chat(
     messages: ChatMessage[],
@@ -349,24 +324,75 @@ export class MagicAppsClient {
     return this.createImage(prompt, options);
   }
 
-  // --- Devices ---
+  // --- AI Conversations ---
 
-  /** Fetch the device catalog for the current app. */
-  async getDevices(): Promise<ApiResponse<DeviceCatalogResponse>> {
-    return this.request<DeviceCatalogResponse>(
-      "GET",
-      `/apps/${this.appId}/devices`,
-    );
-  }
+  readonly conversations = {
+    /** Create a new AI conversation. */
+    create: async (
+      options?: CreateConversationOptions,
+    ): Promise<ApiResponse<Conversation>> => {
+      return this.request<Conversation>(
+        "POST",
+        `/apps/${this.appId}/ai/conversations`,
+        options,
+      );
+    },
 
-  /** Convenience: get a flat list of all devices from the catalog. */
-  async getAllDevices(): Promise<Device[]> {
-    const response = await this.getDevices();
-    const catalog = response.data;
-    return catalog.devices ?? [];
-  }
+    /** List AI conversations for the current user. */
+    list: async (
+      nextToken?: string,
+    ): Promise<ApiResponse<{ conversations: Conversation[]; next_token?: string }>> => {
+      const params = new URLSearchParams();
+      if (nextToken) params.set("next_token", nextToken);
+      const query = params.toString();
+      const path = `/apps/${this.appId}/ai/conversations${query ? `?${query}` : ""}`;
+      return this.request<{ conversations: Conversation[]; next_token?: string }>(
+        "GET",
+        path,
+      );
+    },
 
-  // --- Endpoints ---
+    /** Get a specific AI conversation by ID. */
+    get: async (
+      conversationId: string,
+    ): Promise<ApiResponse<Conversation>> => {
+      return this.request<Conversation>(
+        "GET",
+        `/apps/${this.appId}/ai/conversations/${encodeURIComponent(conversationId)}`,
+      );
+    },
+
+    /** Send a message in an AI conversation. */
+    sendMessage: async (
+      conversationId: string,
+      content: string,
+      options?: SendMessageOptions,
+    ): Promise<ApiResponse<SendMessageResponse>> => {
+      return this.request<SendMessageResponse>(
+        "POST",
+        `/apps/${this.appId}/ai/conversations/${encodeURIComponent(conversationId)}/messages`,
+        { content, ...options },
+      );
+    },
+
+    /** Delete an AI conversation. */
+    delete: async (
+      conversationId: string,
+    ): Promise<ApiResponse<{ deleted: boolean }>> => {
+      return this.request<{ deleted: boolean }>(
+        "DELETE",
+        `/apps/${this.appId}/ai/conversations/${encodeURIComponent(conversationId)}`,
+      );
+    },
+  };
+}
+
+/** Endpoint and event methods. */
+export class EndpointsService {
+  constructor(
+    private request: RequestFn,
+    private appId: string,
+  ) {}
 
   /** Create a new webhook endpoint for the current app. Requires owner auth. */
   async createEndpoint(): Promise<ApiResponse<{
@@ -401,8 +427,6 @@ export class MagicAppsClient {
     return this.request("POST", `/apps/${this.appId}/endpoints/revoke`, { slug });
   }
 
-  // --- Events ---
-
   /** Post an event to a slug endpoint. */
   async postEvent(
     slug: string,
@@ -415,10 +439,255 @@ export class MagicAppsClient {
     return this.request("POST", `/events/${slug}`, payload);
   }
 
-  // --- Lookup Tables ---
+  /** Consume an event from a slug endpoint (single-slot, consume-on-read). */
+  async consumeEvent(slug: string): Promise<ApiResponse<{
+    slug: string;
+    timestamp?: number;
+    created_at?: number;
+    expires_at?: number;
+    text?: string;
+    keywords?: string[];
+    raw_text?: string;
+    metadata?: Record<string, unknown>;
+    empty?: boolean;
+  }>> {
+    return this.request("GET", `/events/${slug}`);
+  }
+}
+
+/** File storage methods. */
+export class FilesService {
+  constructor(
+    private request: RequestFn,
+    private appId: string,
+  ) {}
+
+  /** Get a pre-signed upload URL for a file. */
+  async getUploadUrl(
+    filename: string,
+    contentType: string,
+  ): Promise<ApiResponse<FileUploadUrl>> {
+    return this.request<FileUploadUrl>(
+      "POST",
+      `/apps/${this.appId}/files/upload-url`,
+      { filename, content_type: contentType },
+    );
+  }
+
+  /** List all files for the current user. */
+  async list(): Promise<ApiResponse<{ files: StoredFile[] }>> {
+    return this.request<{ files: StoredFile[] }>(
+      "GET",
+      `/apps/${this.appId}/files`,
+    );
+  }
+
+  /** Get a specific file by ID. */
+  async get(fileId: string): Promise<ApiResponse<StoredFile>> {
+    return this.request<StoredFile>(
+      "GET",
+      `/apps/${this.appId}/files/${encodeURIComponent(fileId)}`,
+    );
+  }
+
+  /** Delete a specific file by ID. */
+  async delete(fileId: string): Promise<ApiResponse<{ deleted: boolean }>> {
+    return this.request<{ deleted: boolean }>(
+      "DELETE",
+      `/apps/${this.appId}/files/${encodeURIComponent(fileId)}`,
+    );
+  }
+}
+
+/** Push notification methods. */
+export class NotificationsService {
+  constructor(
+    private request: RequestFn,
+    private appId: string,
+  ) {}
+
+  /** Register a device for push notifications. */
+  async registerDevice(
+    token: string,
+    platform: string,
+    deviceId?: string,
+  ): Promise<ApiResponse<DeviceRegistration>> {
+    return this.request<DeviceRegistration>(
+      "POST",
+      `/apps/${this.appId}/notifications/register`,
+      { token, platform, ...(deviceId ? { device_id: deviceId } : {}) },
+    );
+  }
+
+  /** Unregister a device from push notifications. */
+  async unregisterDevice(
+    deviceId: string,
+  ): Promise<ApiResponse<{ unregistered: boolean }>> {
+    return this.request<{ unregistered: boolean }>(
+      "DELETE",
+      `/apps/${this.appId}/notifications/register/${encodeURIComponent(deviceId)}`,
+    );
+  }
+}
+
+/** User profile methods. */
+export class ProfilesService {
+  constructor(
+    private request: RequestFn,
+    private appId: string,
+  ) {}
+
+  /** Get the current user's profile. */
+  async get(): Promise<ApiResponse<UserProfile>> {
+    return this.request<UserProfile>(
+      "GET",
+      `/apps/${this.appId}/profile`,
+    );
+  }
+
+  /** Update the current user's profile. */
+  async update(
+    data: UpdateProfileData,
+  ): Promise<ApiResponse<UserProfile>> {
+    return this.request<UserProfile>(
+      "PUT",
+      `/apps/${this.appId}/profile`,
+      data,
+    );
+  }
+
+  /** Get a user's public profile by user ID. */
+  async getPublic(
+    userId: string,
+  ): Promise<ApiResponse<PublicProfile>> {
+    return this.request<PublicProfile>(
+      "GET",
+      `/apps/${this.appId}/profile/${encodeURIComponent(userId)}`,
+    );
+  }
+}
+
+/** Account management methods. */
+export class AccountService {
+  constructor(
+    private request: RequestFn,
+    private appId: string,
+  ) {}
+
+  /** Delete the current user's account. Accepts an optional reason. */
+  async delete(
+    reason?: string,
+  ): Promise<ApiResponse<{ deleted: boolean }>> {
+    return this.request<{ deleted: boolean }>(
+      "DELETE",
+      `/apps/${this.appId}/account`,
+      reason !== undefined ? { reason } : undefined,
+    );
+  }
+
+  /** Export the current user's account data. */
+  async exportData(): Promise<ApiResponse<AccountDataExport>> {
+    return this.request<AccountDataExport>(
+      "GET",
+      `/apps/${this.appId}/account/data-export`,
+    );
+  }
+
+  /** Get the current user's consent preferences. */
+  async getConsent(): Promise<ApiResponse<ConsentPreferences>> {
+    return this.request<ConsentPreferences>(
+      "GET",
+      `/apps/${this.appId}/account/consent`,
+    );
+  }
+
+  /** Update the current user's consent preferences. */
+  async updateConsent(
+    consent: ConsentPreferences,
+  ): Promise<ApiResponse<ConsentPreferences>> {
+    return this.request<ConsentPreferences>(
+      "PUT",
+      `/apps/${this.appId}/account/consent`,
+      consent,
+    );
+  }
+}
+
+/** Settings and configuration methods. */
+export class SettingsService {
+  constructor(
+    private request: RequestFn,
+    private appId: string,
+  ) {}
+
+  /** Get the settings for the current app. */
+  async get(): Promise<ApiResponse<any>> {
+    return this.request("GET", `/apps/${this.appId}/settings`);
+  }
+
+  /** Update the settings for the current app. */
+  async update(
+    body: Record<string, any>,
+  ): Promise<ApiResponse<any>> {
+    return this.request("PUT", `/apps/${this.appId}/settings`, body);
+  }
+
+  /** Get the config for the current app. */
+  async getConfig(): Promise<ApiResponse<any>> {
+    return this.request("GET", `/apps/${this.appId}/config`);
+  }
+
+  /** Update the config for the current app. */
+  async updateConfig(
+    body: Record<string, any>,
+  ): Promise<ApiResponse<any>> {
+    return this.request("PUT", `/apps/${this.appId}/config`, body);
+  }
+
+  /** Get the secret for a specific integration. */
+  async getIntegrationSecret(
+    integrationId: string,
+  ): Promise<ApiResponse<any>> {
+    return this.request(
+      "GET",
+      `/apps/${this.appId}/integrations/${encodeURIComponent(integrationId)}/secret`,
+    );
+  }
+
+  /** Upload or update the secret for a specific integration. */
+  async uploadIntegrationSecret(
+    integrationId: string,
+    body: Record<string, any>,
+  ): Promise<ApiResponse<any>> {
+    return this.request(
+      "POST",
+      `/apps/${this.appId}/integrations/${encodeURIComponent(integrationId)}/secret`,
+      body,
+    );
+  }
+}
+
+/** Catalog methods. */
+export class CatalogService {
+  constructor(
+    private request: RequestFn,
+    private appId: string,
+  ) {}
+
+  /** Get the catalog for the current app. */
+  async get(): Promise<ApiResponse<any>> {
+    return this.request("GET", `/apps/${this.appId}/catalog`);
+  }
+}
+
+/** Lookup table methods. */
+export class LookupTablesService {
+  constructor(
+    private request: RequestFn,
+  ) {}
 
   /** List available lookup tables. */
-  async listLookupTables(): Promise<ApiResponse<{
+  async list(): Promise<ApiResponse<{
     items: Array<{
       lookup_table_id: string;
       name: string;
@@ -437,7 +706,7 @@ export class MagicAppsClient {
   }
 
   /** Get a specific lookup table's metadata including chunk refs. */
-  async getLookupTable(lookupTableId: string): Promise<ApiResponse<{
+  async get(lookupTableId: string): Promise<ApiResponse<{
     lookup_table_id: string;
     name: string;
     description?: string | null;
@@ -465,7 +734,7 @@ export class MagicAppsClient {
   }
 
   /** Fetch an individual data chunk by index. */
-  async getLookupTableChunk(
+  async getChunk(
     lookupTableId: string,
     chunkIndex: number,
     version?: number,
@@ -478,249 +747,160 @@ export class MagicAppsClient {
   }
 
   /** Fetch all chunks and assemble the complete dataset. */
-  async getFullLookupTableDataset(
+  async getFullDataset(
     lookupTableId: string,
   ): Promise<ApiResponse<Record<string, unknown>>> {
-    const tableResponse = await this.getLookupTable(lookupTableId);
+    const tableResponse = await this.get(lookupTableId);
     const table = tableResponse.data;
     const result: Record<string, unknown> = {};
 
     for (let i = 0; i < table.chunk_count; i++) {
-      const chunkResponse = await this.getLookupTableChunk(lookupTableId, i, table.version);
+      const chunkResponse = await this.getChunk(lookupTableId, i, table.version);
       Object.assign(result, chunkResponse.data);
     }
 
     return { data: result, status: 200 };
   }
+}
 
-  /** Consume an event from a slug endpoint (single-slot, consume-on-read). */
-  async consumeEvent(slug: string): Promise<ApiResponse<{
-    slug: string;
-    timestamp?: number;
-    created_at?: number;
-    expires_at?: number;
-    text?: string;
-    keywords?: string[];
-    raw_text?: string;
-    metadata?: Record<string, unknown>;
-    empty?: boolean;
-  }>> {
-    return this.request("GET", `/events/${slug}`);
-  }
+/** Legacy owner registration methods. */
+export class OwnerService {
+  constructor(
+    private request: RequestFn,
+  ) {}
 
-  // --- User Profiles ---
-
-  /** Get the current user's profile. */
-  async getProfile(): Promise<ApiResponse<UserProfile>> {
-    return this.request<UserProfile>(
-      "GET",
-      `/apps/${this.appId}/profile`,
-    );
-  }
-
-  /** Update the current user's profile. */
-  async updateProfile(
-    data: UpdateProfileData,
-  ): Promise<ApiResponse<UserProfile>> {
-    return this.request<UserProfile>(
-      "PUT",
-      `/apps/${this.appId}/profile`,
-      data,
-    );
-  }
-
-  /** Get a user's public profile by user ID. */
-  async getPublicProfile(
-    userId: string,
-  ): Promise<ApiResponse<PublicProfile>> {
-    return this.request<PublicProfile>(
-      "GET",
-      `/apps/${this.appId}/profile/${encodeURIComponent(userId)}`,
-    );
-  }
-
-  // --- Account ---
-
-  /** Delete the current user's account. Accepts an optional reason. */
-  async deleteAccount(
-    reason?: string,
-  ): Promise<ApiResponse<{ deleted: boolean }>> {
-    return this.request<{ deleted: boolean }>(
-      "DELETE",
-      `/apps/${this.appId}/account`,
-      reason !== undefined ? { reason } : undefined,
-    );
-  }
-
-  /** Export the current user's account data. */
-  async exportAccountData(): Promise<ApiResponse<AccountDataExport>> {
-    return this.request<AccountDataExport>(
-      "GET",
-      `/apps/${this.appId}/account/data-export`,
-    );
-  }
-
-  /** Get the current user's consent preferences. */
-  async getConsent(): Promise<ApiResponse<ConsentPreferences>> {
-    return this.request<ConsentPreferences>(
-      "GET",
-      `/apps/${this.appId}/account/consent`,
-    );
-  }
-
-  /** Update the current user's consent preferences. */
-  async updateConsent(
-    consent: ConsentPreferences,
-  ): Promise<ApiResponse<ConsentPreferences>> {
-    return this.request<ConsentPreferences>(
-      "PUT",
-      `/apps/${this.appId}/account/consent`,
-      consent,
-    );
-  }
-
-  // --- File Storage ---
-
-  /** Get a pre-signed upload URL for a file. */
-  async getFileUploadUrl(
-    filename: string,
-    contentType: string,
-  ): Promise<ApiResponse<FileUploadUrl>> {
-    return this.request<FileUploadUrl>(
+  /** Register a device owner for the given app. */
+  async registerOwner(
+    deviceOwnerId: string,
+    appId: string,
+    hcaptchaToken?: string,
+  ): Promise<ApiResponse<{ owner_token: string }>> {
+    return this.request(
       "POST",
-      `/apps/${this.appId}/files/upload-url`,
-      { filename, content_type: contentType },
+      "/owner/register",
+      { device_owner_id: deviceOwnerId, app_id: appId, ...(hcaptchaToken ? { hcaptcha_token: hcaptchaToken } : {}) },
     );
   }
 
-  /** List all files for the current user. */
-  async listFiles(): Promise<ApiResponse<{ files: StoredFile[] }>> {
-    return this.request<{ files: StoredFile[] }>(
-      "GET",
-      `/apps/${this.appId}/files`,
-    );
-  }
-
-  /** Get a specific file by ID. */
-  async getFile(fileId: string): Promise<ApiResponse<StoredFile>> {
-    return this.request<StoredFile>(
-      "GET",
-      `/apps/${this.appId}/files/${encodeURIComponent(fileId)}`,
-    );
-  }
-
-  /** Delete a specific file by ID. */
-  async deleteFile(fileId: string): Promise<ApiResponse<{ deleted: boolean }>> {
-    return this.request<{ deleted: boolean }>(
-      "DELETE",
-      `/apps/${this.appId}/files/${encodeURIComponent(fileId)}`,
-    );
-  }
-
-  // --- AI Conversations ---
-
-  /** Create a new AI conversation. */
-  async createConversation(
-    options?: CreateConversationOptions,
-  ): Promise<ApiResponse<Conversation>> {
-    return this.request<Conversation>(
+  /** Migrate a device owner to a full user account. */
+  async migrateOwnerToUser(
+    deviceOwnerId: string,
+    appId: string,
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request(
       "POST",
-      `/apps/${this.appId}/ai/conversations`,
-      options,
+      "/owner/migrate",
+      { device_owner_id: deviceOwnerId, app_id: appId },
     );
   }
+}
 
-  /** List AI conversations for the current user. */
-  async listConversations(
-    nextToken?: string,
-  ): Promise<ApiResponse<{ conversations: Conversation[]; next_token?: string }>> {
-    const params = new URLSearchParams();
-    if (nextToken) params.set("next_token", nextToken);
-    const query = params.toString();
-    const path = `/apps/${this.appId}/ai/conversations${query ? `?${query}` : ""}`;
-    return this.request<{ conversations: Conversation[]; next_token?: string }>(
+/** Template methods. */
+export class TemplatesService {
+  constructor(
+    private request: RequestFn,
+    private appId: string,
+  ) {}
+
+  /** Get a specific template by ID. */
+  async getTemplate(templateId: string): Promise<ApiResponse<any>> {
+    return this.request(
       "GET",
-      path,
+      `/apps/${this.appId}/templates/${templateId}`,
     );
   }
+}
 
-  /** Get a specific AI conversation by ID. */
-  async getConversation(
-    conversationId: string,
-  ): Promise<ApiResponse<Conversation>> {
-    return this.request<Conversation>(
-      "GET",
-      `/apps/${this.appId}/ai/conversations/${encodeURIComponent(conversationId)}`,
-    );
+// --- Main Client ---
+
+/** MagicApps API client for TypeScript/JavaScript applications. */
+export class MagicAppsClient {
+  private readonly baseUrl: string;
+  private readonly appId: string;
+  private authToken: string | undefined;
+  private readonly timeout: number;
+
+  /** Authentication methods (OAuth, passkeys, magic links). */
+  readonly auth: AuthService;
+  /** Payment and subscription methods. */
+  readonly payments: PaymentsService;
+  /** Entitlement checking methods. */
+  readonly entitlements: EntitlementsService;
+  /** Device catalog methods. */
+  readonly devices: DevicesService;
+  /** AI proxy and conversation methods. */
+  readonly ai: AIService;
+  /** Endpoint and event methods. */
+  readonly endpoints: EndpointsService;
+  /** File storage methods. */
+  readonly files: FilesService;
+  /** Push notification methods. */
+  readonly notifications: NotificationsService;
+  /** User profile methods. */
+  readonly profiles: ProfilesService;
+  /** Account management methods. */
+  readonly account: AccountService;
+  /** Settings and configuration methods. */
+  readonly settings: SettingsService;
+  /** Catalog methods. */
+  readonly catalog: CatalogService;
+  /** Lookup table methods. */
+  readonly lookupTables: LookupTablesService;
+  /** Legacy owner registration methods. */
+  readonly owner: OwnerService;
+  /** Template methods. */
+  readonly templates: TemplatesService;
+
+  constructor(config: MagicAppsConfig) {
+    if (!config.baseUrl) {
+      throw new MagicAppsError("baseUrl is required");
+    }
+    if (!config.appId) {
+      throw new MagicAppsError("appId is required");
+    }
+
+    this.baseUrl = config.baseUrl.replace(/\/+$/, "");
+    this.appId = config.appId;
+    this.authToken = config.authToken;
+    this.timeout = config.timeout ?? DEFAULT_TIMEOUT;
+
+    const boundRequest = this.request.bind(this) as RequestFn;
+
+    this.auth = new AuthService(boundRequest, this.appId);
+    this.payments = new PaymentsService(boundRequest, this.appId);
+    this.entitlements = new EntitlementsService(boundRequest, this.appId);
+    this.devices = new DevicesService(boundRequest, this.appId);
+    this.ai = new AIService(boundRequest, this.appId);
+    this.endpoints = new EndpointsService(boundRequest, this.appId);
+    this.files = new FilesService(boundRequest, this.appId);
+    this.notifications = new NotificationsService(boundRequest, this.appId);
+    this.profiles = new ProfilesService(boundRequest, this.appId);
+    this.account = new AccountService(boundRequest, this.appId);
+    this.settings = new SettingsService(boundRequest, this.appId);
+    this.catalog = new CatalogService(boundRequest, this.appId);
+    this.lookupTables = new LookupTablesService(boundRequest);
+    this.owner = new OwnerService(boundRequest);
+    this.templates = new TemplatesService(boundRequest, this.appId);
   }
 
-  /** Send a message in an AI conversation. */
-  async sendMessage(
-    conversationId: string,
-    content: string,
-    options?: SendMessageOptions,
-  ): Promise<ApiResponse<SendMessageResponse>> {
-    return this.request<SendMessageResponse>(
-      "POST",
-      `/apps/${this.appId}/ai/conversations/${encodeURIComponent(conversationId)}/messages`,
-      { content, ...options },
-    );
+  /** Update the auth token (e.g. after login or token refresh). */
+  setAuthToken(token: string): void {
+    this.authToken = token;
   }
 
-  /** Delete an AI conversation. */
-  async deleteConversation(
-    conversationId: string,
-  ): Promise<ApiResponse<{ deleted: boolean }>> {
-    return this.request<{ deleted: boolean }>(
-      "DELETE",
-      `/apps/${this.appId}/ai/conversations/${encodeURIComponent(conversationId)}`,
-    );
+  /** Clear the auth token (e.g. on logout). */
+  clearAuthToken(): void {
+    this.authToken = undefined;
   }
 
-  // --- Payments / Subscriptions ---
-
-  /** Get the current user's subscription status and entitlement for the app. */
-  async getSubscription(): Promise<ApiResponse<SubscriptionResponse>> {
-    return this.request<SubscriptionResponse>(
-      "GET",
-      `/apps/${this.appId}/subscription`,
-    );
+  /** Health check - verifies connectivity to the MagicApps API. */
+  async ping(): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>("GET", "/ping");
   }
 
-  /** Get a Stripe customer portal URL for the current user. The user will be redirected back to returnUrl after managing their subscription. */
-  async getCustomerPortalUrl(
-    returnUrl: string,
-  ): Promise<ApiResponse<CustomerPortalResponse>> {
-    return this.request<CustomerPortalResponse>(
-      "POST",
-      `/apps/${this.appId}/billing/portal`,
-      { return_url: returnUrl },
-    );
-  }
-
-  // --- Push Notifications ---
-
-  /** Register a device for push notifications. */
-  async registerDevice(
-    token: string,
-    platform: string,
-    deviceId?: string,
-  ): Promise<ApiResponse<DeviceRegistration>> {
-    return this.request<DeviceRegistration>(
-      "POST",
-      `/apps/${this.appId}/notifications/register`,
-      { token, platform, ...(deviceId ? { device_id: deviceId } : {}) },
-    );
-  }
-
-  /** Unregister a device from push notifications. */
-  async unregisterDevice(
-    deviceId: string,
-  ): Promise<ApiResponse<{ unregistered: boolean }>> {
-    return this.request<{ unregistered: boolean }>(
-      "DELETE",
-      `/apps/${this.appId}/notifications/register/${encodeURIComponent(deviceId)}`,
-    );
+  /** Get information about the current application. */
+  async getAppInfo(): Promise<ApiResponse<AppInfo>> {
+    return this.request<AppInfo>("GET", `/apps/${this.appId}`);
   }
 
   private async request<T>(

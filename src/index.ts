@@ -1,4 +1,21 @@
-export { MagicAppsClient } from "./client.js";
+export {
+  MagicAppsClient,
+  AuthService,
+  PaymentsService,
+  EntitlementsService,
+  DevicesService,
+  AIService,
+  EndpointsService,
+  FilesService,
+  NotificationsService,
+  ProfilesService,
+  AccountService,
+  SettingsService,
+  CatalogService,
+  LookupTablesService,
+  OwnerService,
+  TemplatesService,
+} from "./client.js";
 export type {
   MagicAppsConfig,
   AppInfo,
@@ -40,6 +57,10 @@ export type {
   SubscriptionDetails,
   SubscriptionResponse,
   CustomerPortalResponse,
+  EntitlementStatus,
+  AppTier,
+  TiersResponse,
+  ChangeSubscriptionResponse,
 } from "./types.js";
 export { MagicAppsError, ApiError } from "./errors.js";
 export {

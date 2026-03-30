@@ -24,7 +24,7 @@ describe("getAllDevices", () => {
       }),
     );
 
-    const result = await client.getAllDevices();
+    const result = await client.devices.getAllDevices();
     expect(result).toEqual(devices);
     expect(result).toHaveLength(2);
   });
@@ -43,7 +43,7 @@ describe("getAllDevices", () => {
       }),
     );
 
-    const result = await client.getAllDevices();
+    const result = await client.devices.getAllDevices();
     expect(result).toEqual([]);
   });
 
@@ -61,7 +61,7 @@ describe("getAllDevices", () => {
       }),
     );
 
-    const result = await client.getAllDevices();
+    const result = await client.devices.getAllDevices();
     expect(result).toEqual([]);
   });
 
@@ -77,7 +77,7 @@ describe("getAllDevices", () => {
     });
     vi.stubGlobal("fetch", fetchSpy);
 
-    await client.getAllDevices();
+    await client.devices.getAllDevices();
     expect(fetchSpy).toHaveBeenCalledWith(
       "https://api.example.com/apps/my-app/devices",
       expect.objectContaining({ method: "GET" }),
