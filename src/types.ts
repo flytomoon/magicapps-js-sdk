@@ -429,3 +429,26 @@ export interface PaymentVerifyResponse {
   tier_id?: string;
   tier_name?: string;
 }
+
+/** Response from server-to-server token creation via app_secret. */
+export interface CreateUserTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  refresh_token: string;
+  refresh_expires_in: number;
+  created: boolean;
+  user: {
+    user_id: string;
+    email: string;
+  };
+  access: {
+    app_id: string;
+    app_slug: string;
+    tenant_id: string;
+    entitlement_active: boolean;
+    entitlement_state: string;
+    tenant_active: boolean;
+  };
+  entitlement_state: string;
+}

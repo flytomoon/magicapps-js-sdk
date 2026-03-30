@@ -63,6 +63,7 @@ export type {
   ChangeSubscriptionResponse,
   CheckoutSessionResponse,
   PaymentVerifyResponse,
+  CreateUserTokenResponse,
 } from "./types.js";
 export { MagicAppsError, ApiError } from "./errors.js";
 export {

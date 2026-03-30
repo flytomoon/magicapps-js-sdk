@@ -31,6 +31,7 @@ import type {
   ChangeSubscriptionResponse,
   CheckoutSessionResponse,
   PaymentVerifyResponse,
+  CreateUserTokenResponse,
 } from "./types.js";
 import { ApiError, MagicAppsError } from "./errors.js";
 
@@ -151,6 +152,21 @@ export class AuthService {
       "POST",
       "/auth/client/email/verify",
       { token },
+    );
+  }
+
+  /**
+   * Server-to-server: Create a MagicApps token for a verified user email.
+   * Requires app_secret (never expose to client-side code).
+   */
+  async createUserToken(
+    email: string,
+    options: { app_secret: string },
+  ): Promise<ApiResponse<CreateUserTokenResponse>> {
+    return this.request<CreateUserTokenResponse>(
+      "POST",
+      "/auth/server/create-token",
+      { email, app_id: this.appId, app_secret: options.app_secret },
     );
   }
 }

@@ -748,5 +748,77 @@ describe("MagicAppsClient", () => {
       const callHeaders = fetchSpy.mock.calls[0][1].headers;
       expect(callHeaders).not.toHaveProperty("Authorization");
     });
+
+    // --- Auth service: createUserToken (server-to-server) ---
+
+    it("auth.createUserToken calls correct endpoint with app_secret", async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          access_token: "access-tok-123",
+          token_type: "Bearer",
+          expires_in: 1200,
+          refresh_token: "refresh-tok-123",
+          refresh_expires_in: 7776000,
+          created: true,
+          user: { user_id: "u-1", email: "user@example.com" },
+          access: {
+            app_id: "test-app",
+            app_slug: "test-app",
+            tenant_id: "tenant-1",
+            entitlement_active: false,
+            entitlement_state: "inactive",
+            tenant_active: true,
+          },
+          entitlement_state: "inactive",
+        }),
+      });
+
+      const result = await client.auth.createUserToken("user@example.com", {
+        app_secret: "app_sec_abc123",
+      });
+      expect(result.status).toBe(200);
+      expect(result.data.access_token).toBe("access-tok-123");
+      expect(result.data.refresh_token).toBe("refresh-tok-123");
+      expect(result.data.created).toBe(true);
+      expect(result.data.user.user_id).toBe("u-1");
+      expect(result.data.user.email).toBe("user@example.com");
+      expect(result.data.access.app_id).toBe("test-app");
+      expect(result.data.entitlement_state).toBe("inactive");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://api.example.com/auth/server/create-token",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            email: "user@example.com",
+            app_id: "test-app",
+            app_secret: "app_sec_abc123",
+          }),
+        }),
+      );
+    });
+
+    it("auth.createUserToken throws ApiError on 401 invalid secret", async () => {
+      fetchSpy.mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: "Unauthorized",
+        json: async () => ({ error: "Unauthorized", message: "Invalid app secret" }),
+      });
+
+      await expect(
+        client.auth.createUserToken("user@example.com", {
+          app_secret: "app_sec_wrong",
+        }),
+      ).rejects.toThrow(ApiError);
+      try {
+        await client.auth.createUserToken("user@example.com", {
+          app_secret: "app_sec_wrong",
+        });
+      } catch (e) {
+        expect((e as ApiError).statusCode).toBe(401);
+      }
+    });
   });
 });
