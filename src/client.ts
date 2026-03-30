@@ -29,6 +29,8 @@ import type {
   EntitlementStatus,
   TiersResponse,
   ChangeSubscriptionResponse,
+  CheckoutSessionResponse,
+  PaymentVerifyResponse,
 } from "./types.js";
 import { ApiError, MagicAppsError } from "./errors.js";
 
@@ -195,6 +197,28 @@ export class PaymentsService {
       "POST",
       `/pay/subscription/change`,
       { new_tier_id: newTierId },
+    );
+  }
+
+  /** Create a Stripe Checkout session for a first-time purchase or subscription. */
+  async createCheckoutSession(
+    tierId: string,
+    options: { success_url: string; cancel_url: string },
+  ): Promise<ApiResponse<CheckoutSessionResponse>> {
+    return this.request<CheckoutSessionResponse>(
+      "POST",
+      "/pay/checkout",
+      { tier_id: tierId, success_url: options.success_url, cancel_url: options.cancel_url },
+    );
+  }
+
+  /** Verify a payment after Stripe Checkout redirect. */
+  async verifyPayment(
+    sessionId: string,
+  ): Promise<ApiResponse<PaymentVerifyResponse>> {
+    return this.request<PaymentVerifyResponse>(
+      "GET",
+      `/pay/verify?session_id=${encodeURIComponent(sessionId)}`,
     );
   }
 }

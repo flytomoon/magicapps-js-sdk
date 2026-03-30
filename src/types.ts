@@ -414,3 +414,18 @@ export interface ChangeSubscriptionResponse {
   upgrade: boolean;
   new_tier_id: string;
 }
+
+/** Response from creating a Stripe Checkout session. */
+export interface CheckoutSessionResponse {
+  checkout_url: string;
+  session_id: string;
+}
+
+/** Response from verifying a payment after Stripe Checkout redirect. */
+export interface PaymentVerifyResponse {
+  verified: boolean;
+  payment_id?: string;
+  status?: string;
+  tier_id?: string;
+  tier_name?: string;
+}

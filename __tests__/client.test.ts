@@ -420,6 +420,109 @@ describe("MagicAppsClient", () => {
       }
     });
 
+    // --- New method: payments.createCheckoutSession ---
+
+    it("payments.createCheckoutSession returns checkout_url and session_id", async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          checkout_url: "https://checkout.stripe.com/c/pay_abc123",
+          session_id: "cs_test_abc123",
+        }),
+      });
+
+      const result = await client.payments.createCheckoutSession("pro", {
+        success_url: "https://myapp.com/success",
+        cancel_url: "https://myapp.com/cancel",
+      });
+      expect(result.status).toBe(200);
+      expect(result.data.checkout_url).toBe("https://checkout.stripe.com/c/pay_abc123");
+      expect(result.data.session_id).toBe("cs_test_abc123");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://api.example.com/pay/checkout",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            tier_id: "pro",
+            success_url: "https://myapp.com/success",
+            cancel_url: "https://myapp.com/cancel",
+          }),
+        }),
+      );
+    });
+
+    it("payments.createCheckoutSession throws on 401 unauthorized", async () => {
+      fetchSpy.mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: "Unauthorized",
+        json: async () => ({ error: "UNAUTHORIZED", message: "Invalid or expired token" }),
+      });
+
+      await expect(
+        client.payments.createCheckoutSession("pro", {
+          success_url: "https://myapp.com/success",
+          cancel_url: "https://myapp.com/cancel",
+        }),
+      ).rejects.toThrow(ApiError);
+      try {
+        await client.payments.createCheckoutSession("pro", {
+          success_url: "https://myapp.com/success",
+          cancel_url: "https://myapp.com/cancel",
+        });
+      } catch (e) {
+        expect((e as ApiError).statusCode).toBe(401);
+      }
+    });
+
+    // --- New method: payments.verifyPayment ---
+
+    it("payments.verifyPayment returns verified true", async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          verified: true,
+          payment_id: "pay_abc123",
+          status: "complete",
+          tier_id: "pro",
+          tier_name: "Pro",
+        }),
+      });
+
+      const result = await client.payments.verifyPayment("cs_test_abc123");
+      expect(result.status).toBe(200);
+      expect(result.data.verified).toBe(true);
+      expect(result.data.payment_id).toBe("pay_abc123");
+      expect(result.data.status).toBe("complete");
+      expect(result.data.tier_id).toBe("pro");
+      expect(result.data.tier_name).toBe("Pro");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://api.example.com/pay/verify?session_id=cs_test_abc123",
+        expect.objectContaining({ method: "GET" }),
+      );
+    });
+
+    it("payments.verifyPayment returns verified false for invalid session", async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          verified: false,
+        }),
+      });
+
+      const result = await client.payments.verifyPayment("cs_invalid_session");
+      expect(result.status).toBe(200);
+      expect(result.data.verified).toBe(false);
+      expect(result.data.payment_id).toBeUndefined();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://api.example.com/pay/verify?session_id=cs_invalid_session",
+        expect.objectContaining({ method: "GET" }),
+      );
+    });
+
     // --- New method: entitlements.check ---
 
     it("entitlements.check returns entitlement status", async () => {

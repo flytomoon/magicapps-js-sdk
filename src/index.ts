@@ -61,6 +61,8 @@ export type {
   AppTier,
   TiersResponse,
   ChangeSubscriptionResponse,
+  CheckoutSessionResponse,
+  PaymentVerifyResponse,
 } from "./types.js";
 export { MagicAppsError, ApiError } from "./errors.js";
 export {
