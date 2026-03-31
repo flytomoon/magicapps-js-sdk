@@ -422,7 +422,7 @@ describe("MagicAppsClient", () => {
 
     // --- New method: payments.createCheckoutSession ---
 
-    it("payments.createCheckoutSession returns checkout_url and session_id", async () => {
+    it("payments.createCheckoutSession sends app_slug and user_id", async () => {
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
@@ -433,8 +433,7 @@ describe("MagicAppsClient", () => {
       });
 
       const result = await client.payments.createCheckoutSession("pro", {
-        success_url: "https://myapp.com/success",
-        cancel_url: "https://myapp.com/cancel",
+        user_id: "user_123",
       });
       expect(result.status).toBe(200);
       expect(result.data.checkout_url).toBe("https://checkout.stripe.com/c/pay_abc123");
@@ -444,9 +443,37 @@ describe("MagicAppsClient", () => {
         expect.objectContaining({
           method: "POST",
           body: JSON.stringify({
+            app_slug: "test-app",
+            user_id: "user_123",
             tier_id: "pro",
-            success_url: "https://myapp.com/success",
-            cancel_url: "https://myapp.com/cancel",
+          }),
+        }),
+      );
+    });
+
+    it("payments.createCheckoutSession includes purchase_origin when provided", async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          checkout_url: "https://checkout.stripe.com/c/pay_abc123",
+          session_id: "cs_test_abc123",
+        }),
+      });
+
+      await client.payments.createCheckoutSession("pro", {
+        user_id: "user_123",
+        purchase_origin: "ios_external",
+      });
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://api.example.com/pay/checkout",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            app_slug: "test-app",
+            user_id: "user_123",
+            tier_id: "pro",
+            purchase_origin: "ios_external",
           }),
         }),
       );
@@ -462,14 +489,12 @@ describe("MagicAppsClient", () => {
 
       await expect(
         client.payments.createCheckoutSession("pro", {
-          success_url: "https://myapp.com/success",
-          cancel_url: "https://myapp.com/cancel",
+          user_id: "user_123",
         }),
       ).rejects.toThrow(ApiError);
       try {
         await client.payments.createCheckoutSession("pro", {
-          success_url: "https://myapp.com/success",
-          cancel_url: "https://myapp.com/cancel",
+          user_id: "user_123",
         });
       } catch (e) {
         expect((e as ApiError).statusCode).toBe(401);

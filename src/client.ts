@@ -216,15 +216,22 @@ export class PaymentsService {
     );
   }
 
-  /** Create a Stripe Checkout session for a first-time purchase or subscription. */
+  /** Create a Stripe Checkout session for a first-time purchase or subscription.
+   *  The server owns redirect URLs (configured on the app record in DynamoDB).
+   *  Pass the user_id from createUserToken() for bridge-auth flows. */
   async createCheckoutSession(
     tierId: string,
-    options: { success_url: string; cancel_url: string },
+    options: { user_id: string; purchase_origin?: string },
   ): Promise<ApiResponse<CheckoutSessionResponse>> {
     return this.request<CheckoutSessionResponse>(
       "POST",
       "/pay/checkout",
-      { tier_id: tierId, success_url: options.success_url, cancel_url: options.cancel_url },
+      {
+        app_slug: this.appId,
+        user_id: options.user_id,
+        tier_id: tierId,
+        ...(options.purchase_origin ? { purchase_origin: options.purchase_origin } : {}),
+      },
     );
   }
 
