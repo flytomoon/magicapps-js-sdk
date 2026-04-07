@@ -456,3 +456,27 @@ export interface CreateUserTokenResponse {
   };
   entitlement_state: string;
 }
+
+// --- Email Content Types ---
+
+export interface CreateImageTokenResponse {
+  token: string;
+  image_url: string;
+  expires_at: number;
+}
+
+export interface CreateTextTokenResponse {
+  token: string;
+  text_url: string;
+  expires_at: number;
+}
+
+export interface EmailTokenStatus {
+  token: string;
+  type: "image" | "text";
+  state: "armed" | "ready" | "consumed";
+  ready_at: number | null;
+  consumed_at: number | null;
+  expires_at: number;
+  updated_at: number | null;
+}

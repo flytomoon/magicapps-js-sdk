@@ -32,6 +32,9 @@ import type {
   CheckoutSessionResponse,
   PaymentVerifyResponse,
   CreateUserTokenResponse,
+  CreateImageTokenResponse,
+  CreateTextTokenResponse,
+  EmailTokenStatus,
 } from "./types.js";
 import { ApiError, MagicAppsError } from "./errors.js";
 
@@ -884,6 +887,98 @@ export class TemplatesService {
   }
 }
 
+/** Email content methods (image and text tokens for email routines). */
+export class EmailService {
+  constructor(
+    private request: RequestFn,
+    private appId: string,
+  ) {}
+
+  /** Create an image token for an email routine. */
+  async createImageToken(options?: {
+    ttl_seconds?: number;
+    metadata?: Record<string, unknown>;
+  }): Promise<ApiResponse<CreateImageTokenResponse>> {
+    return this.request<CreateImageTokenResponse>(
+      "POST",
+      `/apps/${this.appId}/routines/email-image/tokens`,
+      options ?? {},
+      AuthMode.owner,
+    );
+  }
+
+  /** Upload a JPEG image to an email image token. */
+  async uploadImage(
+    token: string,
+    imageData: string | ArrayBuffer | Blob,
+    options?: {
+      transform?: "image" | "image_overlay" | "meme" | "sketch";
+      query?: string;
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<ApiResponse<null>> {
+    let base64: string;
+    if (typeof imageData === "string") {
+      base64 = imageData.replace(/^data:image\/jpeg;base64,/i, "");
+    } else {
+      const buffer = imageData instanceof Blob
+        ? new Uint8Array(await imageData.arrayBuffer())
+        : new Uint8Array(imageData);
+      if (buffer.length < 2 || buffer[0] !== 0xFF || buffer[1] !== 0xD8) {
+        throw new MagicAppsError("Image must be JPEG format (expected magic bytes 0xFF 0xD8)");
+      }
+      let binary = "";
+      for (let i = 0; i < buffer.length; i++) {
+        binary += String.fromCharCode(buffer[i]);
+      }
+      base64 = btoa(binary);
+    }
+    return this.request<null>(
+      "POST",
+      `/apps/${this.appId}/routines/email-image/${token}`,
+      { image_jpeg_base64: base64, ...options },
+      AuthMode.owner,
+    );
+  }
+
+  /** Create a text token for an email routine. */
+  async createTextToken(options?: {
+    ttl_seconds?: number;
+    metadata?: Record<string, unknown>;
+  }): Promise<ApiResponse<CreateTextTokenResponse>> {
+    return this.request<CreateTextTokenResponse>(
+      "POST",
+      `/apps/${this.appId}/routines/email-text/tokens`,
+      options ?? {},
+      AuthMode.owner,
+    );
+  }
+
+  /** Upload text content to an email text token. */
+  async uploadText(
+    token: string,
+    sentence: string,
+    options?: { metadata?: Record<string, unknown> },
+  ): Promise<ApiResponse<null>> {
+    return this.request<null>(
+      "POST",
+      `/apps/${this.appId}/routines/email-text/${token}`,
+      { sentence, ...options },
+      AuthMode.owner,
+    );
+  }
+
+  /** Get the status of an email token (image or text). */
+  async getTokenStatus(token: string): Promise<ApiResponse<EmailTokenStatus>> {
+    return this.request<EmailTokenStatus>(
+      "GET",
+      `/apps/${this.appId}/routines/email-status/${token}`,
+      undefined,
+      AuthMode.owner,
+    );
+  }
+}
+
 // --- Main Client ---
 
 /** MagicApps API client for TypeScript/JavaScript applications. */
@@ -924,6 +1019,8 @@ export class MagicAppsClient {
   readonly owner: OwnerService;
   /** Template methods. */
   readonly templates: TemplatesService;
+  /** Email content methods (image and text tokens for email routines). */
+  readonly email: EmailService;
 
   constructor(config: MagicAppsConfig) {
     if (!config.baseUrl) {
@@ -956,6 +1053,7 @@ export class MagicAppsClient {
     this.lookupTables = new LookupTablesService(boundRequest);
     this.owner = new OwnerService(boundRequest);
     this.templates = new TemplatesService(boundRequest, this.appId);
+    this.email = new EmailService(boundRequest, this.appId);
   }
 
   /** Update the auth token (e.g. after login or token refresh).
@@ -1021,15 +1119,20 @@ export class MagicAppsClient {
         signal: controller.signal,
       });
 
-      const responseBody = await response.json().catch(() => null);
-
       if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
         throw new ApiError(
           response.status,
           `API request failed: ${response.status} ${response.statusText}`,
-          responseBody,
+          errorBody,
         );
       }
+
+      if (response.status === 204) {
+        return { data: null as T, status: response.status };
+      }
+
+      const responseBody = await response.json().catch(() => null);
 
       return {
         data: responseBody as T,

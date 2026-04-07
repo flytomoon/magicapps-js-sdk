@@ -16,6 +16,7 @@ export {
   LookupTablesService,
   OwnerService,
   TemplatesService,
+  EmailService,
 } from "./client.js";
 export type {
   MagicAppsConfig,
@@ -65,6 +66,9 @@ export type {
   CheckoutSessionResponse,
   PaymentVerifyResponse,
   CreateUserTokenResponse,
+  CreateImageTokenResponse,
+  CreateTextTokenResponse,
+  EmailTokenStatus,
 } from "./types.js";
 export { MagicAppsError, ApiError } from "./errors.js";
 export {
