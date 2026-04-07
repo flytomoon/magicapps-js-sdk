@@ -2017,8 +2017,8 @@ describe("SDK <-> API Contract Validation", () => {
   describe("Auth header contract", () => {
     it("includes Bearer token when authToken is set", async () => {
       const { client, fetchSpy } = setup();
-      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => FIXTURE_APP_INFO });
-      await client.getAppInfo();
+      fetchSpy.mockResolvedValue({ ok: true, status: 200, json: async () => ({ message: "pong" }) });
+      await client.ping();
       const headers = fetchSpy.mock.calls[0][1].headers;
       expect(headers["Authorization"]).toBe("Bearer test-token");
     });
@@ -2028,10 +2028,10 @@ describe("SDK <-> API Contract Validation", () => {
       const fetchSpy = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => FIXTURE_APP_INFO,
+        json: async () => ({ message: "pong" }),
       });
       vi.stubGlobal("fetch", fetchSpy);
-      await client.getAppInfo();
+      await client.ping();
       const headers = fetchSpy.mock.calls[0][1].headers;
       expect(headers["Authorization"]).toBeUndefined();
     });

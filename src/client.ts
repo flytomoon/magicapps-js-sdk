@@ -37,11 +37,22 @@ import { ApiError, MagicAppsError } from "./errors.js";
 
 const DEFAULT_TIMEOUT = 30_000;
 
+/** Authentication mode for API requests. */
+export enum AuthMode {
+  /** Use the access token (Cognito JWT) for user-authenticated requests. */
+  bearer = "bearer",
+  /** Use the owner token (HS256 JWT) for owner-authenticated requests. */
+  owner = "owner",
+  /** No authentication header sent. */
+  none = "none",
+}
+
 /** Type for the internal request function passed to service classes. */
 type RequestFn = <T>(
   method: string,
   path: string,
   body?: unknown,
+  authMode?: AuthMode,
 ) => Promise<ApiResponse<T>>;
 
 // --- Service Classes ---
@@ -62,6 +73,7 @@ export class AuthService {
       "POST",
       "/auth/client/apple/exchange",
       { identity_token: identityToken, app_id: appId },
+      AuthMode.none,
     );
   }
 
@@ -75,6 +87,7 @@ export class AuthService {
       "POST",
       "/auth/client/google/exchange",
       { id_token: idToken, app_id: appId, ...(accessToken ? { access_token: accessToken } : {}) },
+      AuthMode.none,
     );
   }
 
@@ -86,6 +99,7 @@ export class AuthService {
       "POST",
       "/auth/client/refresh",
       { refresh_token: refreshToken },
+      AuthMode.none,
     );
   }
 
@@ -98,12 +112,13 @@ export class AuthService {
       "POST",
       "/auth/client/link",
       { provider, token },
+      AuthMode.none,
     );
   }
 
   /** Get passkey registration options (WebAuthn). */
   async getPasskeyRegisterOptions(): Promise<ApiResponse<any>> {
-    return this.request("POST", "/auth/client/passkey/register/options");
+    return this.request("POST", "/auth/client/passkey/register/options", undefined, AuthMode.none);
   }
 
   /** Verify a passkey registration credential (WebAuthn). */
@@ -114,12 +129,13 @@ export class AuthService {
       "POST",
       "/auth/client/passkey/register/verify",
       credential,
+      AuthMode.none,
     );
   }
 
   /** Get passkey authentication options (WebAuthn). */
   async getPasskeyAuthOptions(): Promise<ApiResponse<any>> {
-    return this.request("POST", "/auth/client/passkey/authenticate/options");
+    return this.request("POST", "/auth/client/passkey/authenticate/options", undefined, AuthMode.none);
   }
 
   /** Verify a passkey authentication assertion (WebAuthn). */
@@ -130,6 +146,7 @@ export class AuthService {
       "POST",
       "/auth/client/passkey/authenticate/verify",
       assertion,
+      AuthMode.none,
     );
   }
 
@@ -141,6 +158,7 @@ export class AuthService {
       "POST",
       "/auth/client/email/request",
       { email },
+      AuthMode.none,
     );
   }
 
@@ -152,6 +170,7 @@ export class AuthService {
       "POST",
       "/auth/client/email/verify",
       { token },
+      AuthMode.none,
     );
   }
 
@@ -167,6 +186,7 @@ export class AuthService {
       "POST",
       "/auth/server/create-token",
       { email, app_id: this.appId, app_secret: options.app_secret },
+      AuthMode.none,
     );
   }
 }
@@ -274,6 +294,8 @@ export class DevicesService {
     return this.request<DeviceCatalogResponse>(
       "GET",
       `/apps/${this.appId}/devices`,
+      undefined,
+      AuthMode.none,
     );
   }
 
@@ -450,7 +472,7 @@ export class EndpointsService {
     hmac_secret?: string;
     hmac_required?: boolean;
   }>> {
-    return this.request("POST", `/apps/${this.appId}/endpoints`);
+    return this.request("POST", `/apps/${this.appId}/endpoints`, undefined, AuthMode.owner);
   }
 
   /** Revoke an endpoint and create a replacement. Requires owner auth. */
@@ -463,7 +485,7 @@ export class EndpointsService {
     hmac_secret?: string;
     hmac_required?: boolean;
   }>> {
-    return this.request("POST", `/apps/${this.appId}/endpoints/revoke_and_replace`, { old_slug: oldSlug });
+    return this.request("POST", `/apps/${this.appId}/endpoints/revoke_and_replace`, { old_slug: oldSlug }, AuthMode.owner);
   }
 
   /** Revoke an endpoint without replacement. Requires owner auth. */
@@ -471,7 +493,7 @@ export class EndpointsService {
     slug: string;
     revoked: boolean;
   }>> {
-    return this.request("POST", `/apps/${this.appId}/endpoints/revoke`, { slug });
+    return this.request("POST", `/apps/${this.appId}/endpoints/revoke`, { slug }, AuthMode.owner);
   }
 
   /** Post an event to a slug endpoint. */
@@ -483,7 +505,7 @@ export class EndpointsService {
     timestamp: number;
     expires_at: number;
   }>> {
-    return this.request("POST", `/events/${slug}`, payload);
+    return this.request("POST", `/events/${slug}`, payload, AuthMode.none);
   }
 
   /** Consume an event from a slug endpoint (single-slot, consume-on-read). */
@@ -498,7 +520,7 @@ export class EndpointsService {
     metadata?: Record<string, unknown>;
     empty?: boolean;
   }>> {
-    return this.request("GET", `/events/${slug}`);
+    return this.request("GET", `/events/${slug}`, undefined, AuthMode.none);
   }
 }
 
@@ -723,7 +745,7 @@ export class CatalogService {
 
   /** Get the catalog for the current app. */
   async get(): Promise<ApiResponse<any>> {
-    return this.request("GET", `/apps/${this.appId}/catalog`);
+    return this.request("GET", `/apps/${this.appId}/catalog`, undefined, AuthMode.none);
   }
 }
 
@@ -749,7 +771,7 @@ export class LookupTablesService {
       updated_at: number;
     }>;
   }>> {
-    return this.request("GET", `/lookup-tables`);
+    return this.request("GET", `/lookup-tables`, undefined, AuthMode.owner);
   }
 
   /** Get a specific lookup table's metadata including chunk refs. */
@@ -777,7 +799,7 @@ export class LookupTablesService {
       byte_length: number;
     }>;
   }>> {
-    return this.request("GET", `/lookup-tables/${encodeURIComponent(lookupTableId)}`);
+    return this.request("GET", `/lookup-tables/${encodeURIComponent(lookupTableId)}`, undefined, AuthMode.owner);
   }
 
   /** Fetch an individual data chunk by index. */
@@ -790,7 +812,7 @@ export class LookupTablesService {
     if (version !== undefined) params.set("version", String(version));
     const query = params.toString();
     const path = `/lookup-tables/${encodeURIComponent(lookupTableId)}/chunks/${chunkIndex}${query ? `?${query}` : ""}`;
-    return this.request("GET", path);
+    return this.request("GET", path, undefined, AuthMode.owner);
   }
 
   /** Fetch all chunks and assemble the complete dataset. */
@@ -826,6 +848,7 @@ export class OwnerService {
       "POST",
       "/owner/register",
       { device_owner_id: deviceOwnerId, app_id: appId, ...(hcaptchaToken ? { hcaptcha_token: hcaptchaToken } : {}) },
+      AuthMode.none,
     );
   }
 
@@ -838,6 +861,7 @@ export class OwnerService {
       "POST",
       "/owner/migrate",
       { device_owner_id: deviceOwnerId, app_id: appId },
+      AuthMode.none,
     );
   }
 }
@@ -854,6 +878,8 @@ export class TemplatesService {
     return this.request(
       "GET",
       `/apps/${this.appId}/templates/${templateId}`,
+      undefined,
+      AuthMode.none,
     );
   }
 }
@@ -864,7 +890,8 @@ export class TemplatesService {
 export class MagicAppsClient {
   private readonly baseUrl: string;
   private readonly appId: string;
-  private authToken: string | undefined;
+  private accessToken: string | undefined;
+  private ownerToken: string | undefined;
   private readonly timeout: number;
 
   /** Authentication methods (OAuth, passkeys, magic links). */
@@ -908,7 +935,8 @@ export class MagicAppsClient {
 
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
     this.appId = config.appId;
-    this.authToken = config.authToken;
+    this.accessToken = config.accessToken ?? config.authToken;
+    this.ownerToken = config.ownerToken;
     this.timeout = config.timeout ?? DEFAULT_TIMEOUT;
 
     const boundRequest = this.request.bind(this) as RequestFn;
@@ -930,14 +958,28 @@ export class MagicAppsClient {
     this.templates = new TemplatesService(boundRequest, this.appId);
   }
 
-  /** Update the auth token (e.g. after login or token refresh). */
+  /** Update the auth token (e.g. after login or token refresh).
+   *  @deprecated Use setTokens() instead. This sets the accessToken for backwards compatibility. */
   setAuthToken(token: string): void {
-    this.authToken = token;
+    this.accessToken = token;
   }
 
-  /** Clear the auth token (e.g. on logout). */
+  /** Clear the auth token (e.g. on logout).
+   *  @deprecated Use clearTokens() instead. This clears the accessToken for backwards compatibility. */
   clearAuthToken(): void {
-    this.authToken = undefined;
+    this.accessToken = undefined;
+  }
+
+  /** Set both access and owner tokens. */
+  setTokens(tokens: { accessToken?: string; ownerToken?: string }): void {
+    if (tokens.accessToken !== undefined) this.accessToken = tokens.accessToken;
+    if (tokens.ownerToken !== undefined) this.ownerToken = tokens.ownerToken;
+  }
+
+  /** Clear both access and owner tokens (e.g. on logout). */
+  clearTokens(): void {
+    this.accessToken = undefined;
+    this.ownerToken = undefined;
   }
 
   /** Health check - verifies connectivity to the MagicApps API. */
@@ -947,22 +989,26 @@ export class MagicAppsClient {
 
   /** Get information about the current application. */
   async getAppInfo(): Promise<ApiResponse<AppInfo>> {
-    return this.request<AppInfo>("GET", `/apps/${this.appId}`);
+    return this.request<AppInfo>("GET", `/apps/${this.appId}`, undefined, AuthMode.none);
   }
 
   private async request<T>(
     method: string,
     path: string,
     body?: unknown,
+    authMode: AuthMode = AuthMode.bearer,
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${path}`;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
 
-    if (this.authToken) {
-      headers["Authorization"] = `Bearer ${this.authToken}`;
+    if (authMode === AuthMode.bearer && this.accessToken) {
+      headers["Authorization"] = `Bearer ${this.accessToken}`;
+    } else if (authMode === AuthMode.owner && this.ownerToken) {
+      headers["Authorization"] = `Bearer ${this.ownerToken}`;
     }
+    // AuthMode.none: no auth header
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);

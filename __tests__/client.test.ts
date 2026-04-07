@@ -122,10 +122,10 @@ describe("MagicAppsClient", () => {
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({}),
+        json: async () => ({ message: "pong" }),
       });
 
-      await client.getAppInfo();
+      await client.ping();
       expect(fetchSpy).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({

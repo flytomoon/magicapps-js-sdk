@@ -1,5 +1,6 @@
 export {
   MagicAppsClient,
+  AuthMode,
   AuthService,
   PaymentsService,
   EntitlementsService,

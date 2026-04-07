@@ -4,7 +4,11 @@ export interface MagicAppsConfig {
   baseUrl: string;
   /** The app_id for your registered application. */
   appId: string;
-  /** Optional auth token for authenticated requests. */
+  /** Optional access token (Cognito JWT) for user-authenticated requests. */
+  accessToken?: string;
+  /** Optional owner token (HS256 JWT) for owner-authenticated requests. */
+  ownerToken?: string;
+  /** @deprecated Use accessToken instead. Alias for accessToken for backwards compatibility. */
   authToken?: string;
   /** Request timeout in milliseconds. Defaults to 30000. */
   timeout?: number;
