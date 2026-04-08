@@ -927,15 +927,14 @@ export class EmailService {
       if (buffer.length < 2 || buffer[0] !== 0xFF || buffer[1] !== 0xD8) {
         throw new MagicAppsError("Image must be JPEG format (expected magic bytes 0xFF 0xD8)");
       }
-      if (typeof Buffer !== "undefined") {
-        base64 = Buffer.from(buffer).toString("base64");
-      } else {
-        let binary = "";
-        for (let i = 0; i < buffer.length; i++) {
-          binary += String.fromCharCode(buffer[i]);
-        }
-        base64 = btoa(binary);
+      // Use btoa with chunked approach to avoid call stack limits on large arrays
+      const chunks: string[] = [];
+      const chunkSize = 8192;
+      for (let i = 0; i < buffer.length; i += chunkSize) {
+        const slice = buffer.subarray(i, i + chunkSize);
+        chunks.push(String.fromCharCode(...slice));
       }
+      base64 = btoa(chunks.join(""));
     }
     return this.request<null>(
       "POST",
