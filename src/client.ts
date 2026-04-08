@@ -927,14 +927,22 @@ export class EmailService {
       if (buffer.length < 2 || buffer[0] !== 0xFF || buffer[1] !== 0xD8) {
         throw new MagicAppsError("Image must be JPEG format (expected magic bytes 0xFF 0xD8)");
       }
-      // Use btoa with chunked approach to avoid call stack limits on large arrays
-      const chunks: string[] = [];
-      const chunkSize = 8192;
-      for (let i = 0; i < buffer.length; i += chunkSize) {
-        const slice = buffer.subarray(i, i + chunkSize);
-        chunks.push(String.fromCharCode(...slice));
+      // Pure base64 encoding (works in both Node.js and browsers)
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+      const pad = buffer.length % 3;
+      const parts: string[] = [];
+      for (let i = 0; i < buffer.length; i += 3) {
+        const b0 = buffer[i];
+        const b1 = i + 1 < buffer.length ? buffer[i + 1] : 0;
+        const b2 = i + 2 < buffer.length ? buffer[i + 2] : 0;
+        parts.push(
+          alphabet[b0 >> 2],
+          alphabet[((b0 & 3) << 4) | (b1 >> 4)],
+          i + 1 < buffer.length ? alphabet[((b1 & 15) << 2) | (b2 >> 6)] : "=",
+          i + 2 < buffer.length ? alphabet[b2 & 63] : "=",
+        );
       }
-      base64 = btoa(chunks.join(""));
+      base64 = parts.join("");
     }
     return this.request<null>(
       "POST",
