@@ -121,7 +121,7 @@ describe("AuthMode", () => {
     expect(headers["Authorization"]).toBe("Bearer new-token");
   });
 
-  it("owner mode falls back to no header when ownerToken is unset", async () => {
+  it("owner mode falls back to accessToken when ownerToken is unset", async () => {
     const client = new MagicAppsClient({
       baseUrl: "https://api.test",
       appId: "app1",
@@ -129,7 +129,7 @@ describe("AuthMode", () => {
     });
     await client.endpoints.createEndpoint();
     const headers = mockFetch.mock.calls[0][1].headers;
-    expect(headers["Authorization"]).toBeUndefined();
+    expect(headers["Authorization"]).toBe("Bearer access-jwt");
   });
 
   it("lookup tables use owner auth mode", async () => {
@@ -201,5 +201,66 @@ describe("AuthMode", () => {
     await client.getAppInfo();
     const headers = mockFetch.mock.calls[0][1].headers;
     expect(headers["Authorization"]).toBeUndefined();
+  });
+});
+
+describe("AuthMode owner-to-bearer fallback", () => {
+  let mockFetch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ message: "ok" }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("uses ownerToken when both tokens are set and mode is owner", async () => {
+    const client = new MagicAppsClient({
+      baseUrl: "https://api.test",
+      appId: "app1",
+      accessToken: "access-jwt",
+      ownerToken: "owner-jwt",
+    });
+    await client.endpoints.createEndpoint();
+    const headers = mockFetch.mock.calls[0][1].headers;
+    expect(headers["Authorization"]).toBe("Bearer owner-jwt");
+  });
+
+  it("falls back to accessToken when ownerToken is not set and mode is owner", async () => {
+    const client = new MagicAppsClient({
+      baseUrl: "https://api.test",
+      appId: "app1",
+      accessToken: "access-jwt",
+    });
+    await client.endpoints.createEndpoint();
+    const headers = mockFetch.mock.calls[0][1].headers;
+    expect(headers["Authorization"]).toBe("Bearer access-jwt");
+  });
+
+  it("sends no auth header when neither token is set and mode is owner", async () => {
+    const client = new MagicAppsClient({
+      baseUrl: "https://api.test",
+      appId: "app1",
+    });
+    await client.endpoints.createEndpoint();
+    const headers = mockFetch.mock.calls[0][1].headers;
+    expect(headers["Authorization"]).toBeUndefined();
+  });
+
+  it("email service uses bearer fallback for web SDK usage", async () => {
+    const client = new MagicAppsClient({
+      baseUrl: "https://api.test",
+      appId: "app1",
+      accessToken: "web-user-jwt",
+    });
+    await client.email.createImageToken();
+    const headers = mockFetch.mock.calls[0][1].headers;
+    expect(headers["Authorization"]).toBe("Bearer web-user-jwt");
   });
 });

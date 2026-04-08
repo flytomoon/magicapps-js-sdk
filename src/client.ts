@@ -37,14 +37,23 @@ import type {
   EmailTokenStatus,
 } from "./types.js";
 import { ApiError, MagicAppsError } from "./errors.js";
+import { generateHmacSignature } from "./hmac.js";
 
 const DEFAULT_TIMEOUT = 30_000;
 
-/** Authentication mode for API requests. */
+/**
+ * Authentication mode for API requests.
+ *
+ * On web, all methods use the access token (only `accessToken` is set).
+ * On mobile, methods that predate account creation use the owner token,
+ * while payment/entitlement methods use the access token.
+ * When `owner` is requested but no `ownerToken` is set, the SDK
+ * automatically uses `accessToken` instead.
+ */
 export enum AuthMode {
   /** Use the access token (Cognito JWT) for user-authenticated requests. */
   bearer = "bearer",
-  /** Use the owner token (HS256 JWT) for owner-authenticated requests. */
+  /** Use the owner token (HS256 JWT). Falls back to accessToken if ownerToken is not set. */
   owner = "owner",
   /** No authentication header sent. */
   none = "none",
@@ -56,6 +65,7 @@ type RequestFn = <T>(
   path: string,
   body?: unknown,
   authMode?: AuthMode,
+  extraHeaders?: Record<string, string>,
 ) => Promise<ApiResponse<T>>;
 
 // --- Service Classes ---
@@ -459,7 +469,12 @@ export class AIService {
   };
 }
 
-/** Endpoint and event methods. */
+/**
+ * Endpoint and event methods.
+ *
+ * Endpoint management (create, revoke) uses owner auth on mobile and
+ * access token auth on web. Event posting uses HMAC signing (no bearer token).
+ */
 export class EndpointsService {
   constructor(
     private request: RequestFn,
@@ -499,16 +514,23 @@ export class EndpointsService {
     return this.request("POST", `/apps/${this.appId}/endpoints/revoke`, { slug }, AuthMode.owner);
   }
 
-  /** Post an event to a slug endpoint. */
+  /** Post an event to a slug endpoint. Optionally sign with HMAC. */
   async postEvent(
     slug: string,
     payload: Record<string, unknown>,
+    hmacSecret?: string,
   ): Promise<ApiResponse<{
     slug: string;
     timestamp: number;
     expires_at: number;
   }>> {
-    return this.request("POST", `/events/${slug}`, payload, AuthMode.none);
+    let extraHeaders: Record<string, string> | undefined;
+    if (hmacSecret) {
+      const bodyString = JSON.stringify(payload);
+      const { signature, timestamp } = await generateHmacSignature(slug, bodyString, hmacSecret);
+      extraHeaders = { "X-Signature": signature, "X-Timestamp": timestamp };
+    }
+    return this.request("POST", `/events/${slug}`, payload, AuthMode.none, extraHeaders);
   }
 
   /** Consume an event from a slug endpoint (single-slot, consume-on-read). */
@@ -887,7 +909,12 @@ export class TemplatesService {
   }
 }
 
-/** Email content methods (image and text tokens for email routines). */
+/**
+ * Email content methods (image and text tokens for email routines).
+ *
+ * Uses owner auth on mobile and access token auth on web. Requires the
+ * Growth plan tier or above.
+ */
 export class EmailService {
   constructor(
     private request: RequestFn,
@@ -1106,6 +1133,7 @@ export class MagicAppsClient {
     path: string,
     body?: unknown,
     authMode: AuthMode = AuthMode.bearer,
+    extraHeaders?: Record<string, string>,
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${path}`;
     const headers: Record<string, string> = {
@@ -1114,10 +1142,19 @@ export class MagicAppsClient {
 
     if (authMode === AuthMode.bearer && this.accessToken) {
       headers["Authorization"] = `Bearer ${this.accessToken}`;
-    } else if (authMode === AuthMode.owner && this.ownerToken) {
-      headers["Authorization"] = `Bearer ${this.ownerToken}`;
+    } else if (authMode === AuthMode.owner) {
+      // Prefer ownerToken; fall back to accessToken for web SDK usage
+      const token = this.ownerToken ?? this.accessToken;
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
     }
     // AuthMode.none: no auth header
+
+    // Merge extra headers (e.g., HMAC signature headers)
+    if (extraHeaders) {
+      Object.assign(headers, extraHeaders);
+    }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);

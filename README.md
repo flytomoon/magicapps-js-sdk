@@ -35,20 +35,40 @@ const { data: catalog } = await client.getCatalog();
 
 ## Authentication
 
-Pass an auth token for authenticated endpoints:
+The SDK supports two authentication contexts depending on your platform:
+
+**Web apps** — Users authenticate via Cognito (Apple Sign-In, Google, passkeys, magic links) and receive an access token. Pass it as `accessToken`:
 
 ```typescript
 const client = new MagicAppsClient({
   baseUrl: "https://api.yourplatform.com",
   appId: "your-app-id",
-  authToken: "your-jwt-token",
+  accessToken: "cognito-jwt-token",
 });
+```
 
-// Update the token later (e.g. after login or refresh)
+**Mobile apps (iOS/Android)** — Devices register anonymously via `registerOwner()` and receive an owner token. After account creation, users also get an access token. Pass both:
+
+```typescript
+const client = new MagicAppsClient({
+  baseUrl: "https://api.yourplatform.com",
+  appId: "your-app-id",
+  ownerToken: "owner-jwt-from-registration",
+  accessToken: "cognito-jwt-after-login",  // optional, set after account creation
+});
+```
+
+All SDK methods use the appropriate token automatically. On web, all methods work with just `accessToken`. On mobile, methods that predate account creation (endpoints, email, lookups) use `ownerToken`, while payment and entitlement methods use `accessToken`.
+
+```typescript
+// Update tokens after login or refresh
+client.setTokens({ accessToken: "new-access-token" });
+
+// Or update just the access token (legacy alias)
 client.setAuthToken("new-token");
 
-// Clear the token (e.g. on logout)
-client.clearAuthToken();
+// Clear all tokens (e.g. on logout)
+client.clearTokens();
 ```
 
 ### Apple Sign-In
@@ -228,10 +248,17 @@ const { data: endpoint } = await client.createEndpoint();
 console.log(`Slug: ${endpoint.slug}`);
 console.log(`Path: ${endpoint.endpoint_path}`);
 
-// Post an event to an endpoint
+// Post an event to an endpoint (unsigned)
 const { data: event } = await client.postEvent(endpoint.slug, {
   message: "Hello from the SDK",
 });
+
+// Post a signed event (HMAC-SHA256 — use the secret from endpoint creation)
+const { data: signed } = await client.postEvent(
+  endpoint.slug,
+  { message: "Signed payload" },
+  endpoint.hmac_secret,
+);
 
 // Consume an event (single-slot, consume-on-read)
 const { data: consumed } = await client.consumeEvent(endpoint.slug);
@@ -248,7 +275,7 @@ await client.revokeEndpoint(endpoint.slug);
 
 ### HMAC Signing
 
-The SDK provides standalone functions for generating and verifying HMAC signatures on endpoint events. The signature format is `HMAC-SHA256(secret, "slug:timestamp:body")`.
+The simplest way to sign events is by passing `hmacSecret` directly to `postEvent()` (see above). For advanced use cases — such as verifying incoming webhooks or signing requests outside the SDK — standalone helper functions are also available. The signature format is `HMAC-SHA256(secret, "slug:timestamp:body")`.
 
 ```typescript
 import { generateHmacSignature, verifyHmacSignature } from "@magic-apps-cloud/sdk";
@@ -446,7 +473,9 @@ await client.uploadIntegrationSecret("integration-id", {
 |--------|------|----------|---------|-------------|
 | `baseUrl` | `string` | Yes | - | Base URL of the Magic Apps Cloud API |
 | `appId` | `string` | Yes | - | Your registered application ID |
-| `authToken` | `string` | No | - | JWT token for authenticated requests |
+| `accessToken` | `string` | No | - | Cognito JWT for authenticated user requests (web and mobile) |
+| `ownerToken` | `string` | No | - | Owner JWT from device registration (mobile only) |
+| `authToken` | `string` | No | - | **Deprecated.** Alias for `accessToken` |
 | `timeout` | `number` | No | `30000` | Request timeout in milliseconds |
 
 ## Error Handling
