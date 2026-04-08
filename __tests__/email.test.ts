@@ -26,6 +26,7 @@ describe("EmailService", () => {
   let client: MagicAppsClient;
 
   beforeEach(() => {
+    mockFetch.mockClear();
     vi.stubGlobal("fetch", mockFetch);
     client = new MagicAppsClient({
       baseUrl: "https://api.test",
