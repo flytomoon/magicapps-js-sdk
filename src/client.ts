@@ -927,11 +927,15 @@ export class EmailService {
       if (buffer.length < 2 || buffer[0] !== 0xFF || buffer[1] !== 0xD8) {
         throw new MagicAppsError("Image must be JPEG format (expected magic bytes 0xFF 0xD8)");
       }
-      let binary = "";
-      for (let i = 0; i < buffer.length; i++) {
-        binary += String.fromCharCode(buffer[i]);
+      if (typeof Buffer !== "undefined") {
+        base64 = Buffer.from(buffer).toString("base64");
+      } else {
+        let binary = "";
+        for (let i = 0; i < buffer.length; i++) {
+          binary += String.fromCharCode(buffer[i]);
+        }
+        base64 = btoa(binary);
       }
-      base64 = btoa(binary);
     }
     return this.request<null>(
       "POST",
