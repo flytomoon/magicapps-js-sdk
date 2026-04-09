@@ -1,6 +1,10 @@
 {
   "name": "@magic-apps-cloud/sdk",
-  "version": "0.16.0",
+
+
+
+  "version": "0.16.1",
+
   "description": "Magic Apps Cloud SDK for TypeScript/JavaScript",
   "type": "module",
   "main": "./dist/index.js",
