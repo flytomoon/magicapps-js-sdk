@@ -299,6 +299,58 @@ const isValid = await verifyHmacSignature(
 );
 ```
 
+## Email
+
+Create tokenized email content (images and text) and deliver it to recipients via the platform's email service. Requires the Growth plan.
+
+```typescript
+// Create an image token (returns a hosted URL that shows a placeholder until content is uploaded)
+const { data: imageToken } = await client.email.createImageToken();
+console.log(imageToken.token);      // "img_abc123"
+console.log(imageToken.image_url);  // "https://img.assethost.net/r/i/img_abc123.jpg"
+
+// Upload the actual image content (JPEG, base64-encoded)
+await client.email.uploadImage(imageToken.token, jpegBase64String);
+
+// Create a text token (same pattern — placeholder until text is uploaded)
+const { data: textToken } = await client.email.createTextToken();
+
+// Upload text content (rendered as a styled SVG image)
+await client.email.uploadText(textToken.token, { sentence: "Your prediction was correct!" });
+
+// Check token status
+const { data: status } = await client.email.getImageTokenStatus(imageToken.token);
+console.log(status.state);  // "armed" | "ready" | "consumed"
+```
+
+### Sending Email
+
+Deliver tokenized content to a recipient via the platform's email service. The email contains the hosted image/text inline — no attachments, no links to click.
+
+```typescript
+// Send an email with an image token
+const { data: result } = await client.email.send({
+  to: "recipient@example.com",
+  token: imageToken.token,
+  subject: "Game result",
+  senderName: "Chris C.",  // optional — appears as "Chris C. via Your App"
+});
+console.log(result.message_id);  // SES message ID
+console.log(result.status);      // "sent"
+```
+
+The email arrives as:
+```
+From: "Chris C. via Your App" <noreply@send.assethost.net>
+Subject: Game result
+Body: [inline image from the token]
+```
+
+- `senderName` is optional — if omitted, the From shows just the app name
+- Rate limited: 10 emails/hour, 50 emails/day per user
+- Recipients can unsubscribe via a link in the email footer
+- Works with both image and text tokens (both render as inline images)
+
 ## Lookup Tables
 
 Read-only access to lookup tables (reference data configured by tenant admins).
