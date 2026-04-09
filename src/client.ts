@@ -1015,6 +1015,26 @@ export class EmailService {
       AuthMode.owner,
     );
   }
+
+  /** Send tokenized content via email. */
+  async send(options: {
+    to: string;
+    token: string;
+    subject: string;
+    senderName?: string;
+  }): Promise<ApiResponse<{ message_id: string; status: string }>> {
+    return this.request(
+      "POST",
+      `/apps/${this.appId}/routines/email-send`,
+      {
+        to: options.to,
+        token: options.token,
+        subject: options.subject,
+        ...(options.senderName ? { sender_name: options.senderName } : {}),
+      },
+      AuthMode.owner,
+    );
+  }
 }
 
 // --- Main Client ---
