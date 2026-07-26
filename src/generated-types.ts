@@ -80,6 +80,35 @@ export interface ErrorResponse {
   message: string;
 }
 
+export interface AffiliateEnrollResponse {
+  code: string;
+  share_url: string;
+}
+
+/** A VoxKit SDK license record (never includes the raw key). */
+export interface LicenseInfo {
+  /** License id (license_key_hash). */
+  id: string;
+  customer_id: string;
+  bundle_ids: string[];
+  features: string[];
+  status: 'active' | 'revoked' | 'expired';
+  /** Epoch seconds when issued. */
+  issued_at?: number | null;
+  /** Epoch seconds when it expires, or null for no expiry. */
+  expires_at?: number | null;
+}
+
+export interface LicenseActivateRequest {
+  licenseKey: string;
+  bundleId: string;
+}
+
+export interface LicenseTokenResponse {
+  /** Short-lived Ed25519-signed license token verified on-device. */
+  token: string;
+}
+
 /** Full user profile (returned to the profile owner) */
 export interface UserProfile {
   user_id?: string;
